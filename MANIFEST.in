@@ -1,0 +1,10 @@
+include CONSTITUTION.md
+include README.md
+include LICENSE
+include config/env
+include config/env.dev
+recursive-include script *.py
+recursive-include core *.py
+recursive-include evolver *.py
+recursive-include core *.py
+recursive-include evolver *.py
