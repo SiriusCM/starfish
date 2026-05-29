@@ -12,7 +12,6 @@ HELP = (
     "  starfish evolve --apply  触发进化并写盘生效\n"
     "  starfish snapshots       查看已有快照列表\n"
     "  starfish rollback [tag]  回滚到指定快照（默认最近一次）\n"
-    "  starfish reset           重置 script 为初始版本\n"
     "  starfish web             启动 Web 界面（浏览器访问）\n"
     "\n"
     "对话模式中：\n"
@@ -76,17 +75,6 @@ def main():
         from evolver.snapshot import rollback
         tag = sys.argv[2] if len(sys.argv) > 2 else ""
         print(f"↩️  {rollback(tag)}")
-        return
-
-    if len(sys.argv) > 1 and sys.argv[1] == "reset":
-        import os
-        import shutil
-        from settings import DATA_DIR, PKG_DIR, SCRIPT_DIR
-        pkg_script = os.path.join(PKG_DIR, "script")
-        if os.path.isdir(SCRIPT_DIR):
-            shutil.rmtree(SCRIPT_DIR)
-        shutil.copytree(pkg_script, SCRIPT_DIR)
-        print("✅ script/ 已从源码重新拷贝（恢复出厂设置）")
         return
 
     # 默认启动桌面版

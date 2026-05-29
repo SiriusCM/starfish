@@ -8,8 +8,10 @@ import threading
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import QUrl, pyqtSignal, QObject
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtGui import QIcon
 
 from core.server import app as flask_app
+from settings import PKG_DIR
 
 
 class ServerSignals(QObject):
@@ -65,6 +67,12 @@ def run_desktop():
     app = QApplication(sys.argv)
     app.setApplicationName("Starfish Agent")
 
+    # 设置应用图标
+    icon_path = os.path.join(PKG_DIR, "core", "static", "icon.png")
+    if os.path.exists(icon_path):
+        app_icon = QIcon(icon_path)
+        app.setWindowIcon(app_icon)
+
     # 启动信号
     signals = ServerSignals()
 
@@ -92,6 +100,9 @@ def run_desktop():
 
     # 创建并显示窗口
     window = StarfishWindow()
+    # 窗口也设置图标（macOS 下 dock 图标需要单独设置）
+    if os.path.exists(icon_path):
+        window.setWindowIcon(QIcon(icon_path))
     window.show()
 
     return app.exec()
