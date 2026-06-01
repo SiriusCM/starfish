@@ -87,6 +87,24 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        -- MCP 服务端配置（用户可在 UI 增删改启停）
+        -- transport: stdio | sse
+        -- command/args: stdio 模式下的启动命令与参数（JSON 数组）
+        -- env: 注入子进程的环境变量（JSON 对象）
+        -- url: sse 模式下的服务地址
+        CREATE TABLE IF NOT EXISTS mcp_servers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            transport TEXT NOT NULL DEFAULT 'stdio',
+            command TEXT DEFAULT '',
+            args TEXT DEFAULT '[]',
+            env TEXT DEFAULT '{}',
+            url TEXT DEFAULT '',
+            enabled INTEGER DEFAULT 1,
+            description TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
     """)
 
     # 插入默认配置

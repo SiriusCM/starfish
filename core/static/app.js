@@ -191,3 +191,153 @@ async function saveSettings() {
         toast('保存失败: ' + e.message, true);
     }
 }
+
+// ── MCP 服务端管理 ────────────────────────────────────────
+function openMcp() {
+    document.getElementById('mcpModal').classList.add('show');
+    cancelMcpForm();
+    loadMcpList();
+    document.getElementById('mcpTools').textContent = '';
+}
+function closeMcp() { document.getElementById('mcpModal').classList.remove('show'); }
+function closeMcpOnOverlay(e) {
+    if (e.target === document.getElementById('mcpModal')) closeMcp();
+}
+
+async function loadMcpList() {
+    try {
+        const d = await (await fetch(`${API}/api/mcp/servers`)).json();
+        const list = document.getElementById('mcpList');
+        if (!d.success) { list.innerHTML = '<span style="color:#d63031">加载失败</span>'; return; }
+        if (!d.servers.length) { list.innerHTML = '<span style="color:#888">暂无配置，点击 + 新增</span>'; return; }
+        list.innerHTML = d.servers.map(s => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #f0f0f0;">
+                <div>
+                    <div style="font-weight:500;">${s.name} <span style="color:${s.enabled?'#27ae60':'#999'};font-size:12px;">[${s.enabled?'启用':'禁用'}]</span> <span style="color:#888;font-size:12px;">[${s.transport||'stdio'}]</span></div>
+                    <div style="color:#888;font-size:12px;">${s.transport==='http' ? (s.url||'') : ((s.command||'')+' '+((s.args||[]).join(' ')))}</div>
+                    ${s.description?`<div style="color:#aaa;font-size:12px;">${s.description}</div>`:''}
+                </div>
+                <div style="display:flex;gap:4px;">
+                    <button class="modal-btn modal-btn-secondary" onclick='toggleMcp(${s.id}, ${!s.enabled})'>${s.enabled?'禁用':'启用'}</button>
+                    <button class="modal-btn modal-btn-secondary" onclick='editMcp(${JSON.stringify(s).replace(/'/g, "&#39;")})'>编辑</button>
+                    <button class="modal-btn modal-btn-secondary" onclick='deleteMcp(${s.id})' style="color:#d63031;">删除</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('mcpList').innerHTML = '<span style="color:#d63031">网络错误</span>';
+    }
+}
+
+function showMcpForm() {
+    document.getElementById('mcpForm').style.display = 'block';
+    document.getElementById('mcpFormId').value = '';
+    document.getElementById('mcpName').value = '';
+    document.getElementById('mcpTransport').value = 'http';
+    document.getElementById('mcpUrl').value = 'http://localhost:8801/mcp';
+    document.getElementById('mcpCommand').value = '';
+    document.getElementById('mcpArgs').value = '[]';
+    document.getElementById('mcpEnv').value = '{}';
+    document.getElementById('mcpDesc').value = '';
+    document.getElementById('mcpEnabled').checked = true;
+    onMcpTransportChange();
+}
+function cancelMcpForm() { document.getElementById('mcpForm').style.display = 'none'; }
+
+function onMcpTransportChange() {
+    const t = document.getElementById('mcpTransport').value;
+    document.getElementById('mcpUrlGroup').style.display  = (t === 'http')  ? '' : 'none';
+    document.getElementById('mcpCmdGroup').style.display  = (t === 'stdio') ? '' : 'none';
+    document.getElementById('mcpArgsGroup').style.display = (t === 'stdio') ? '' : 'none';
+}
+
+function editMcp(s) {
+    document.getElementById('mcpForm').style.display = 'block';
+    document.getElementById('mcpFormId').value = s.id;
+    document.getElementById('mcpName').value = s.name || '';
+    document.getElementById('mcpTransport').value = s.transport || 'http';
+    document.getElementById('mcpUrl').value = s.url || '';
+    document.getElementById('mcpCommand').value = s.command || '';
+    document.getElementById('mcpArgs').value = JSON.stringify(s.args || []);
+    document.getElementById('mcpEnv').value = JSON.stringify(s.env || {});
+    document.getElementById('mcpDesc').value = s.description || '';
+    document.getElementById('mcpEnabled').checked = !!s.enabled;
+    onMcpTransportChange();
+}
+
+async function saveMcp() {
+    let args, env;
+    try { args = JSON.parse(document.getElementById('mcpArgs').value || '[]'); }
+    catch { toast('args 必须是合法 JSON 数组', true); return; }
+    try { env = JSON.parse(document.getElementById('mcpEnv').value || '{}'); }
+    catch { toast('env 必须是合法 JSON 对象', true); return; }
+
+    const transport = document.getElementById('mcpTransport').value;
+    const body = {
+        name: document.getElementById('mcpName').value.trim(),
+        transport,
+        url: document.getElementById('mcpUrl').value.trim(),
+        command: document.getElementById('mcpCommand').value.trim(),
+        args, env,
+        description: document.getElementById('mcpDesc').value.trim(),
+        enabled: document.getElementById('mcpEnabled').checked ? 1 : 0,
+    };
+    if (!body.name) { toast('name 不能为空', true); return; }
+    if (transport === 'http' && !body.url) { toast('http 协议必须填写 url', true); return; }
+    if (transport === 'stdio' && !body.command) { toast('stdio 协议必须填写 command', true); return; }
+
+    const id = document.getElementById('mcpFormId').value;
+    const url = id ? `${API}/api/mcp/servers/${id}` : `${API}/api/mcp/servers`;
+    const method = id ? 'PUT' : 'POST';
+    try {
+        const d = await (await fetch(url, {
+            method, headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        })).json();
+        if (d.success) { toast('已保存'); cancelMcpForm(); loadMcpList(); }
+        else toast(d.detail || '保存失败', true);
+    } catch (e) { toast('保存失败: ' + e.message, true); }
+}
+
+async function toggleMcp(id, enabled) {
+    try {
+        const d = await (await fetch(`${API}/api/mcp/servers/${id}/toggle`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled}),
+        })).json();
+        if (d.success) { toast('已切换'); loadMcpList(); }
+        else toast(d.detail || '失败', true);
+    } catch (e) { toast('失败: ' + e.message, true); }
+}
+
+async function deleteMcp(id) {
+    if (!confirm('确定删除该 MCP 服务端配置？')) return;
+    try {
+        const d = await (await fetch(`${API}/api/mcp/servers/${id}`, {method: 'DELETE'})).json();
+        if (d.success) { toast('已删除'); loadMcpList(); }
+        else toast(d.detail || '失败', true);
+    } catch (e) { toast('失败: ' + e.message, true); }
+}
+
+async function reloadMcp() {
+    toast('重新连接中...');
+    try {
+        const d = await (await fetch(`${API}/api/mcp/reload`, {method: 'POST'})).json();
+        if (d.success) toast(`已重连，工具数: ${d.tools}`);
+        else toast(d.detail || '失败', true);
+    } catch (e) { toast('失败: ' + e.message, true); }
+}
+
+async function loadMcpTools() {
+    try {
+        const d = await (await fetch(`${API}/api/mcp/tools`)).json();
+        const box = document.getElementById('mcpTools');
+        if (!d.success) { box.textContent = '加载失败'; return; }
+        if (!d.tools.length) { box.textContent = '当前未加载任何 MCP 工具'; return; }
+        box.innerHTML = '<b>已加载工具：</b><br>' + d.tools.map(t =>
+            `<div style="margin:4px 0;"><code>${t.name}</code> — <span style="color:#666;">${t.description||''}</span></div>`
+        ).join('');
+    } catch (e) {
+        document.getElementById('mcpTools').textContent = '网络错误';
+    }
+}

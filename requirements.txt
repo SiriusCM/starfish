@@ -1,6 +1,6 @@
 crewai>=0.80.0
 crewai-tools>=0.14.0
-mcp>=1.0.0
+mcp>=1.10.0
 python-dotenv>=1.0.0
 sentence-transformers>=2.2.0
 flask>=3.0.0
