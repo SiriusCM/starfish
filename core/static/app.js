@@ -484,3 +484,260 @@ async function importSkill(input) {
         input.value = '';  // 允许重复选同一个文件
     }
 }
+
+// ── Agent 配置 ──────────────────────────────────────────
+function openAgent() {
+    document.getElementById('agentModal').classList.add('show');
+    cancelAgentForm();
+    loadAgentList();
+}
+function closeAgent() { document.getElementById('agentModal').classList.remove('show'); }
+function closeAgentOnOverlay(e) {
+    if (e.target === document.getElementById('agentModal')) closeAgent();
+}
+
+async function loadAgentList() {
+    try {
+        const d = await (await fetch(`${API}/api/agents`)).json();
+        const list = document.getElementById('agentList');
+        if (!d.success) { list.innerHTML = '<span style="color:#d63031">加载失败</span>'; return; }
+        if (!d.agents.length) { list.innerHTML = '<span style="color:#888">暂无 Agent</span>'; return; }
+        list.innerHTML = d.agents.map(a => {
+            const isGeneral = a.id === 'general';
+            const lockTip = isGeneral ? ' 🔒' : '';
+            const toggleBtn = isGeneral ? '' :
+                `<button class="modal-btn modal-btn-secondary" onclick='toggleAgent("${a.id}", ${!a.enabled})'>${a.enabled?'禁用':'启用'}</button>`;
+            const delBtn = isGeneral ? '' :
+                `<button class="modal-btn modal-btn-secondary" onclick='deleteAgent("${a.id}")' style="color:#d63031;">删除</button>`;
+            return `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px;border-bottom:1px solid #f0f0f0;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:500;">${a.name}${lockTip} <span style="color:#888;font-size:12px;">[${a.id}]</span> <span style="color:${a.enabled?'#27ae60':'#999'};font-size:12px;">[${a.enabled?'启用':'禁用'}]</span> <span style="color:#888;font-size:12px;">命中 ${a.hit_count||0}</span></div>
+                    <div style="color:#666;font-size:13px;">${a.description||''}</div>
+                    <div style="color:#aaa;font-size:12px;">domains: ${JSON.stringify(a.domains||['*'])}${a.parent?` · parent: ${a.parent}`:''}</div>
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0;">
+                    ${toggleBtn}
+                    <button class="modal-btn modal-btn-secondary" onclick='editAgent(${JSON.stringify(a).replace(/'/g, "&#39;")})'>编辑</button>
+                    ${delBtn}
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        document.getElementById('agentList').innerHTML = '<span style="color:#d63031">网络错误</span>';
+    }
+}
+
+function showAgentForm() {
+    document.getElementById('agentForm').style.display = 'block';
+    document.getElementById('agentFormMode').value = 'add';
+    document.getElementById('agentId').value = '';
+    document.getElementById('agentId').disabled = false;
+    document.getElementById('agentName').value = '';
+    document.getElementById('agentDesc').value = '';
+    document.getElementById('agentDomains').value = '["*"]';
+    document.getElementById('agentRole').value = '智能助手';
+    document.getElementById('agentGoal').value = '帮助用户完成任务。';
+    document.getElementById('agentBackstory').value = '你是一个智能助手。';
+    document.getElementById('agentEnabled').checked = true;
+}
+function cancelAgentForm() { document.getElementById('agentForm').style.display = 'none'; }
+
+function editAgent(a) {
+    document.getElementById('agentForm').style.display = 'block';
+    document.getElementById('agentFormMode').value = 'edit';
+    document.getElementById('agentId').value = a.id || '';
+    document.getElementById('agentId').disabled = true;
+    document.getElementById('agentName').value = a.name || '';
+    document.getElementById('agentDesc').value = a.description || '';
+    document.getElementById('agentDomains').value = JSON.stringify(a.domains || ['*']);
+    document.getElementById('agentRole').value = a.role || '';
+    document.getElementById('agentGoal').value = a.goal || '';
+    document.getElementById('agentBackstory').value = a.backstory || '';
+    document.getElementById('agentEnabled').checked = !!a.enabled;
+}
+
+async function saveAgent() {
+    let domains;
+    try { domains = JSON.parse(document.getElementById('agentDomains').value || '["*"]'); }
+    catch { toast('domains 必须是合法 JSON 数组', true); return; }
+
+    const mode = document.getElementById('agentFormMode').value;
+    const id = document.getElementById('agentId').value.trim();
+    const body = {
+        name: document.getElementById('agentName').value.trim(),
+        description: document.getElementById('agentDesc').value.trim(),
+        domains,
+        role: document.getElementById('agentRole').value.trim(),
+        goal: document.getElementById('agentGoal').value.trim(),
+        backstory: document.getElementById('agentBackstory').value.trim(),
+        enabled: document.getElementById('agentEnabled').checked ? 1 : 0,
+    };
+    if (mode === 'add') {
+        if (!id) { toast('id 不能为空', true); return; }
+        body.id = id;
+    }
+    if (!body.name || !body.role || !body.goal || !body.backstory) {
+        toast('name/role/goal/backstory 都必填', true); return;
+    }
+
+    const url = mode === 'add' ? `${API}/api/agents` : `${API}/api/agents/${id}`;
+    const method = mode === 'add' ? 'POST' : 'PUT';
+    try {
+        const d = await (await fetch(url, {
+            method, headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        })).json();
+        if (d.success) { toast('已保存'); cancelAgentForm(); loadAgentList(); }
+        else toast(d.detail || '保存失败', true);
+    } catch (e) { toast('保存失败: ' + e.message, true); }
+}
+
+async function toggleAgent(id, enabled) {
+    try {
+        const d = await (await fetch(`${API}/api/agents/${id}/toggle`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled}),
+        })).json();
+        if (d.success) loadAgentList();
+        else toast(d.detail || '失败', true);
+    } catch (e) { toast('失败: ' + e.message, true); }
+}
+
+async function deleteAgent(id) {
+    if (!confirm(`确定删除 Agent ${id}？该 Agent 的专属规则也会一并清除。`)) return;
+    try {
+        const d = await (await fetch(`${API}/api/agents/${id}`, {method: 'DELETE'})).json();
+        if (d.success) { toast('已删除'); loadAgentList(); }
+        else toast(d.detail || '失败', true);
+    } catch (e) { toast('失败: ' + e.message, true); }
+}
+
+// ── Prompt 常量覆盖 ──────────────────────────────────────
+function openPrompt() {
+    document.getElementById('promptModal').classList.add('show');
+    loadPromptList();
+}
+function closePrompt() { document.getElementById('promptModal').classList.remove('show'); }
+function closePromptOnOverlay(e) {
+    if (e.target === document.getElementById('promptModal')) closePrompt();
+}
+
+async function loadPromptList() {
+    const box = document.getElementById('promptList');
+    box.textContent = '加载中...';
+    try {
+        const d = await (await fetch(`${API}/api/prompts`)).json();
+        if (!d.success) { box.innerHTML = '<span style="color:#d63031">加载失败</span>'; return; }
+        box.innerHTML = d.items.map(it => {
+            const safeKey = it.key;
+            const safeVal = (it.value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const eff = (it.effective || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const flag = it.overridden ? `<span style="color:#00b894;font-size:12px;">[已覆盖 · ${it.updated_at}]</span>` : '<span style="color:#888;font-size:12px;">[使用默认]</span>';
+            return `
+                <div style="border:1px solid #eee;border-radius:8px;padding:10px;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <div><b>${safeKey}</b> ${flag}</div>
+                        <div style="display:flex;gap:4px;">
+                            <button class="modal-btn modal-btn-primary" onclick="savePrompt('${safeKey}')">保存</button>
+                            ${it.overridden ? `<button class="modal-btn modal-btn-secondary" onclick="resetPrompt('${safeKey}')">恢复默认</button>` : ''}
+                        </div>
+                    </div>
+                    <textarea id="pp_${safeKey}" rows="4" style="width:100%;">${safeVal}</textarea>
+                    <details style="margin-top:6px;">
+                        <summary style="color:#888;font-size:12px;cursor:pointer;">当前生效值（默认或覆盖后）</summary>
+                        <pre style="white-space:pre-wrap;background:#f7f7f7;border-radius:6px;padding:8px;font-size:12px;color:#333;">${eff}</pre>
+                    </details>
+                </div>`;
+        }).join('');
+    } catch (e) {
+        box.innerHTML = '<span style="color:#d63031">网络错误</span>';
+    }
+}
+
+async function savePrompt(key) {
+    const value = document.getElementById('pp_' + key).value;
+    if (!value.trim()) {
+        // 空字符串视作恢复默认
+        return resetPrompt(key);
+    }
+    try {
+        const d = await (await fetch(`${API}/api/prompts/${key}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({value}),
+        })).json();
+        if (d.success) { toast('已保存'); loadPromptList(); }
+        else toast(d.detail || '保存失败', true);
+    } catch (e) { toast('保存失败: ' + e.message, true); }
+}
+
+async function resetPrompt(key) {
+    try {
+        const d = await (await fetch(`${API}/api/prompts/${key}`, {method: 'DELETE'})).json();
+        if (d.success) { toast('已恢复默认'); loadPromptList(); }
+        else toast(d.detail || '失败', true);
+    } catch (e) {toast('失败: ' + e.message, true); }
+}
+
+// ── 工具列表（只读）────────────────────────────────────
+function openTools() {
+    document.getElementById('toolsModal').classList.add('show');
+    loadToolsList();
+}
+function closeTools() { document.getElementById('toolsModal').classList.remove('show'); }
+function closeToolsOnOverlay(e) {
+    if (e.target === document.getElementById('toolsModal')) closeTools();
+}
+
+async function loadToolsList() {
+    const box = document.getElementById('toolsList');
+    box.textContent = '加载中...';
+    try {
+        const d = await (await fetch(`${API}/api/tools`)).json();
+        if (!d.success) { box.innerHTML = '<span style="color:#d63031">加载失败</span>'; return; }
+        if (!d.tools.length) { box.innerHTML = '<span style="color:#888">暂无工具</span>'; return; }
+
+        // 按来源分组
+        const builtin = d.tools.filter(t => t.source === 'builtin');
+        const byServer = {};
+        d.tools.filter(t => t.source === 'mcp').forEach(t => {
+            (byServer[t.server || '(unknown)'] = byServer[t.server || '(unknown)'] || []).push(t);
+        });
+        const errors = d.tools.filter(t => t.source === 'error');
+
+        const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const renderItem = t => `
+            <div style="border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:6px;background:#fafafa;">
+                <div style="font-weight:500;color:#2d3436;">
+                    <code>${esc(t.full_name || t.name)}</code>
+                </div>
+                <div style="color:#666;font-size:13px;margin-top:2px;">${esc(t.description) || '<span style="color:#aaa;">(无描述)</span>'}</div>
+            </div>`;
+
+        let html = '';
+        html += `<div style="margin-bottom:14px;">
+            <div style="font-weight:500;margin-bottom:6px;">🛠 内置工具 <span style="color:#888;font-size:12px;">(${builtin.length})</span></div>
+            ${builtin.length ? builtin.map(renderItem).join('') : '<span style="color:#888;">无</span>'}
+        </div>`;
+
+        Object.keys(byServer).sort().forEach(server => {
+            const list = byServer[server];
+            html += `<div style="margin-bottom:14px;">
+                <div style="font-weight:500;margin-bottom:6px;">🔌 MCP · <code>${esc(server)}</code> <span style="color:#888;font-size:12px;">(${list.length})</span></div>
+                ${list.map(renderItem).join('')}
+            </div>`;
+        });
+
+        if (errors.length) {
+            html += `<div style="margin-bottom:14px;color:#d63031;">
+                <div style="font-weight:500;margin-bottom:6px;">⚠️ 加载出错</div>
+                ${errors.map(t => `<div>${esc(t.name)}：${esc(t.description)}</div>`).join('')}
+            </div>`;
+        }
+
+        html += `<div style="color:#888;font-size:12px;text-align:right;">合计 ${d.count} 个工具</div>`;
+        box.innerHTML = html;
+    } catch (e) {
+        box.innerHTML = '<span style="color:#d63031">网络错误: ' + e.message + '</span>';
+    }
+}

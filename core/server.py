@@ -146,7 +146,8 @@ def save_settings():
 
 
 # ── MCP 服务端管理 ──────────────────────────────────────
-from core import mcp_registry, mcp_client, skill_registry
+from core import mcp_registry, mcp_client, skill_registry, prompt_registry
+from core import agent_registry as agent_reg
 
 
 @app.route('/api/mcp/servers', methods=['GET'])
@@ -307,6 +308,141 @@ def api_skill_import():
         return jsonify({"success": False, "detail": f"Import error: {e}"}), 400
 
 
+# ── Agent 管理 ─────────────────────────────────────────
+@app.route('/api/agents', methods=['GET'])
+def api_agent_list():
+    try:
+        return jsonify({"success": True, "agents": agent_reg.list_agents()})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"List error: {e}"}), 500
+
+
+@app.route('/api/agents', methods=['POST'])
+def api_agent_add():
+    data = request.get_json() or {}
+    required = ["id", "name", "role", "goal", "backstory"]
+    for k in required:
+        if not data.get(k):
+            return jsonify({"success": False, "detail": f"缺少字段 {k}"}), 400
+    if not data.get("domains"):
+        data["domains"] = ["*"]
+    try:
+        ok = agent_reg.add_agent(data)
+        return jsonify({"success": ok, "detail": "" if ok else "id 已存在或写入失败"})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"Add error: {e}"}), 400
+
+
+@app.route('/api/agents/<agent_id>', methods=['PUT'])
+def api_agent_update(agent_id: str):
+    data = request.get_json() or {}
+    try:
+        ok = agent_reg.update_agent(agent_id, data)
+        return jsonify({"success": ok})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"Update error: {e}"}), 400
+
+
+@app.route('/api/agents/<agent_id>', methods=['DELETE'])
+def api_agent_delete(agent_id: str):
+    try:
+        ok = agent_reg.delete_agent(agent_id)
+        return jsonify({"success": ok, "detail": "" if ok else "通用助手不可删除或 id 不存在"})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"Delete error: {e}"}), 500
+
+
+@app.route('/api/agents/<agent_id>/toggle', methods=['POST'])
+def api_agent_toggle(agent_id: str):
+    data = request.get_json() or {}
+    enabled = bool(data.get("enabled", True))
+    try:
+        ok = agent_reg.set_enabled(agent_id, enabled)
+        return jsonify({"success": ok, "detail": "" if ok else "通用助手不可禁用"})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"Toggle error: {e}"}), 500
+
+
+# ── Prompt 常量覆盖 ─────────────────────────────────────
+@app.route('/api/prompts', methods=['GET'])
+def api_prompt_list():
+    """列出所有可覆盖的 prompt 常量及当前覆盖值。
+    同时返回 prompts.py 默认值（defaults）方便前端做 placeholder 提示。"""
+    try:
+        items = prompt_registry.list_overrides()
+        # 加入默认值（来自当前 prompts.py + 已应用的 override，前端能看到"实际生效值"）
+        from core.orchestrator import _load_prompts
+        eff = _load_prompts()
+        for it in items:
+            it["effective"] = getattr(eff, it["key"], "")
+        return jsonify({"success": True, "items": items, "allowed_keys": list(prompt_registry.ALLOWED_KEYS)})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"List error: {e}"}), 500
+
+
+@app.route('/api/prompts/<key>', methods=['PUT'])
+def api_prompt_set(key: str):
+    data = request.get_json() or {}
+    value = data.get("value", "")
+    try:
+        prompt_registry.set_override(key, value)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"{e}"}), 400
+
+
+@app.route('/api/prompts/<key>', methods=['DELETE'])
+def api_prompt_delete(key: str):
+    try:
+        ok = prompt_registry.delete_override(key)
+        return jsonify({"success": ok})
+    except Exception as e:
+        return jsonify({"success": False, "detail": f"Delete error: {e}"}), 500
+
+
+# ── 工具列表（只读：内置工具 + MCP 工具合并展示）────────
+@app.route('/api/tools', methods=['GET'])
+def api_tools_list():
+    """聚合展示当前实际可被 executor 使用的所有工具。
+    - 内置工具来自 script/tools.py 的 ALL_TOOLS（来源标记为 builtin）
+    - MCP 工具来自 mcp_client.get_mcp_tools()（来源标记为 mcp + 所属 server 名）
+    所有字段只读。
+    """
+    items = []
+    # 内置
+    try:
+        from core.orchestrator import _load_script
+        tools_mod = _load_script("tools")
+        for t in getattr(tools_mod, "ALL_TOOLS", []):
+            items.append({
+                "name": getattr(t, "name", t.__class__.__name__),
+                "description": getattr(t, "description", "") or "",
+                "source": "builtin",
+                "server": "",
+            })
+    except Exception as e:
+        items.append({"name": "(builtin load error)", "description": str(e), "source": "error", "server": ""})
+
+    # MCP
+    try:
+        for t in mcp_client.get_mcp_tools():
+            full = getattr(t, "name", "")  # 形如 "mysql.mysql_exec"
+            server = full.split(".", 1)[0] if "." in full else ""
+            short = full.split(".", 1)[1] if "." in full else full
+            items.append({
+                "name": short,
+                "full_name": full,
+                "description": getattr(t, "description", "") or "",
+                "source": "mcp",
+                "server": server,
+            })
+    except Exception as e:
+        items.append({"name": "(mcp load error)", "description": str(e), "source": "error", "server": ""})
+
+    return jsonify({"success": True, "tools": items, "count": len(items)})
+
+
 def run_server(host: str = "127.0.0.1", port: int = 8765):
     """启动 HTTP 服务器"""
+    app.run(host=host, port=port, debug=False, threaded=True)
     app.run(host=host, port=port, debug=False, threaded=True)

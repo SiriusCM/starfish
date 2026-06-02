@@ -5,8 +5,8 @@ from crewai import Agent, Task, Crew, Process, LLM
 from settings import LLM_MODEL, LLM_BASE_URL, LLM_API_KEY, SCRIPT_DIR
 from .chat_log import append_history, write_chat_log, write_evolve_hint, history_context
 from .user_profile import rules_context
-from .agent_registry import list_agents, route, record_hit
-from . import mcp_client, mcp_registry, skill_registry
+from .agent_registry import list_agents, route, record_hit, current_version as agent_version
+from . import mcp_client, mcp_registry, skill_registry, prompt_registry
 
 
 # (mtime, module) cache —— 文件未变则复用已加载模块，避免重复 exec
@@ -52,15 +52,24 @@ def _get_llm():
     return _llm
 
 
+def _load_prompts():
+    """加载 prompts.py 并叠加 SQLite 中的常量覆盖。"""
+    P = _load_script("prompts")
+    return prompt_registry.apply_overrides_to_module(P)
+
+
 # planner 单例：role/goal/backstory 全来自常量，无需每次重建
-_planner_cache: dict = {}  # {"mtime": float, "agent": Agent}
+_planner_cache: dict = {}  # {"mtime": float, "prompt_ver": float, "agent": Agent}
 
 
 def _get_planner() -> Agent:
-    P = _load_script("prompts")
+    P = _load_prompts()
     mtime = _script_mtime("prompts")
+    p_ver = prompt_registry.current_version()
     cached = _planner_cache.get("agent")
-    if cached is not None and _planner_cache.get("mtime") == mtime:
+    if (cached is not None
+            and _planner_cache.get("mtime") == mtime
+            and _planner_cache.get("prompt_ver") == p_ver):
         return cached
     agent = Agent(
         role=P.PLANNER_ROLE,
@@ -74,6 +83,7 @@ def _get_planner() -> Agent:
     )
     _planner_cache["agent"] = agent
     _planner_cache["mtime"] = mtime
+    _planner_cache["prompt_ver"] = p_ver
     return agent
 
 
@@ -81,11 +91,12 @@ def _get_planner() -> Agent:
 _executor_cache: dict = {}  # {agent_id: Agent}
 _executor_tools_mtime: float = 0.0
 _executor_mcp_version: float = -1.0
+_executor_agent_version: float = -1.0
 
 
 def _build_agent_list() -> str:
-    """构建智能体列表文本供 planner 选择领域。"""
-    agents = list_agents()
+    """构建智能体列表文本供 planner 选择领域（仅启用的）。"""
+    agents = list_agents(only_enabled=True)
     if not agents:
         return "- general(通用助手): 处理所有问题, domains=[*]"
     lines = []
@@ -97,14 +108,18 @@ def _build_agent_list() -> str:
 
 def _build_executor(agent_def: dict) -> Agent:
     """根据智能体定义动态构建 executor Agent；按 agent_id 缓存。
-    tools.py 变更或 MCP 注册表版本变更时整体失效。"""
-    global _executor_tools_mtime, _executor_mcp_version
+    tools.py 变更、MCP 注册表版本变更或 agent 注册表版本变更时整体失效。"""
+    global _executor_tools_mtime, _executor_mcp_version, _executor_agent_version
     tools_mtime = _script_mtime("tools")
     mcp_version = mcp_registry.current_version()
-    if tools_mtime != _executor_tools_mtime or mcp_version != _executor_mcp_version:
+    a_version = agent_version()
+    if (tools_mtime != _executor_tools_mtime
+            or mcp_version != _executor_mcp_version
+            or a_version != _executor_agent_version):
         _executor_cache.clear()
         _executor_tools_mtime = tools_mtime
         _executor_mcp_version = mcp_version
+        _executor_agent_version = a_version
 
     agent_id = agent_def.get("id", "general")
     cached = _executor_cache.get(agent_id)
@@ -184,7 +199,7 @@ def _resolve_skill_content(plan_result: str, agent_id: str) -> tuple[str, list[s
 
 
 def run(user_input: str) -> str:
-    P = _load_script("prompts")
+    P = _load_prompts()
     ctx = history_context()
     global_rules = rules_context()
     agent_list = _build_agent_list()
@@ -260,4 +275,45 @@ def run(user_input: str) -> str:
     except Exception as e:
         err = f"执行出错：{type(e).__name__}: {e}"
         write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        return answer
+    except Exception as e:
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
         raise

@@ -14,6 +14,9 @@
             <button class="settings-btn" onclick="openSettings()" title="设置">&#9881;</button>
             <button class="settings-btn" onclick="openMcp()" title="MCP 服务端">&#128268;</button>
             <button class="settings-btn" onclick="openSkill()" title="Skill 配置">&#127919;</button>
+            <button class="settings-btn" onclick="openAgent()" title="Agent 配置">&#129302;</button>
+            <button class="settings-btn" onclick="openPrompt()" title="Prompt 常量">&#128221;</button>
+            <button class="settings-btn" onclick="openTools()" title="工具列表（只读）">&#128296;</button>
             <span class="header-info"><span class="status-dot"></span>在线</span>
         </div>
     </header>
@@ -202,8 +205,101 @@
         </div>
     </div>
 
+    <!-- Agent 配置弹窗 -->
+    <div class="modal-overlay" id="agentModal" onclick="closeAgentOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">Agent 配置</div>
+                <button class="modal-close" onclick="closeAgent()">&times;</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <button class="modal-btn modal-btn-primary" onclick="showAgentForm()">+ 新增</button>
+                <span style="color:#888;font-size:12px;align-self:center;">通用助手(general)不可删除或禁用</span>
+            </div>
+
+            <div id="agentList" style="max-height:300px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;">
+                加载中...
+            </div>
+
+            <div id="agentForm" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px;">
+                <input type="hidden" id="agentFormMode" value="add">
+                <div class="form-group">
+                    <label>ID（snake_case，新增后不可改）</label>
+                    <input type="text" id="agentId" placeholder="例如: programming">
+                </div>
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="agentName" placeholder="例如: 编程助手">
+                </div>
+                <div class="form-group">
+                    <label>一句话描述</label>
+                    <input type="text" id="agentDesc" placeholder="例如: 处理代码相关问题">
+                </div>
+                <div class="form-group">
+                    <label>负责领域（JSON 数组，* 表示兜底）</label>
+                    <input type="text" id="agentDomains" placeholder='例如: ["编程"] 或 ["*"]'>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <input type="text" id="agentRole" placeholder="例如: 编程专家">
+                </div>
+                <div class="form-group">
+                    <label>Goal</label>
+                    <textarea id="agentGoal" rows="2" placeholder="智能体目标"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Backstory（描述其专业能力）</label>
+                    <textarea id="agentBackstory" rows="4" placeholder="背景故事"></textarea>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <label style="margin:0;">启用</label>
+                    <input type="checkbox" id="agentEnabled" checked>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-secondary" onclick="cancelAgentForm()">取消</button>
+                    <button class="modal-btn modal-btn-primary" onclick="saveAgent()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt 常量覆盖弹窗 -->
+    <div class="modal-overlay" id="promptModal" onclick="closePromptOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">Prompt 常量覆盖</div>
+                <button class="modal-close" onclick="closePrompt()">&times;</button>
+            </div>
+            <div style="color:#888;font-size:12px;margin-bottom:12px;">
+                这里只能覆盖 prompts.py 里的"纯文本常量"（如 PLANNER_GOAL / TOOL_CATALOG）。<br>
+                带 <code>{xxx}</code> 占位符的模板由代码契约管理，不开放编辑。<br>
+                清空保存即恢复默认值。
+            </div>
+            <div id="promptList" style="max-height:520px;overflow:auto;">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 工具列表弹窗（只读） -->
+    <div class="modal-overlay" id="toolsModal" onclick="closeToolsOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">工具列表（只读）</div>
+                <button class="modal-close" onclick="closeTools()">&times;</button>
+            </div>
+            <div style="color:#888;font-size:12px;margin-bottom:12px;">
+                这里展示 Agent 当前实际可调用的所有工具。<br>
+                · <b>内置工具</b>来自 <code>script/tools.py</code>，由 evolver 通过 <code>propose_create_tool</code> 自动新增<br>
+                · <b>MCP 工具</b>来自 🔌 配置的 MCP 服务端，启停在 MCP 弹窗里管理
+            </div>
+            <div id="toolsList" style="max-height:520px;overflow:auto;">加载中...</div>
+        </div>
+    </div>
+
     <script src="/static/app.js"></script>
 </body>
+</html>
+</html>
 </html>
 </html>
 </html>

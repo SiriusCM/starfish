@@ -274,6 +274,64 @@ def propose_split_agent(payload: str) -> str:
     return f"OK：裂变提案已记录（{agent_id}，当前共 {len(_proposals)} 条）"
 
 
+@tool("propose_create_skill")
+def propose_create_skill(payload: str) -> str:
+    """新增一条 Skill（按需激活的"任务剧本"）。
+    Skill 是优先于 split_agent 的轻量手段：
+    - 同领域出现可复用的步骤模板（如"周报生成"、"日志分析"）→ 用 skill
+    - 仅当该领域需要全新工具集 / 与既有 agent 性格相左 → 才考虑 split_agent
+    payload 为 JSON：
+    {
+        "name": "snake_case_name（唯一）",
+        "summary": "一句话简介，planner 用它判断是否激活",
+        "triggers": "触发关键词，逗号分隔（可选）",
+        "content": "完整指引（Markdown 也可），命中后将注入 executor prompt",
+        "domains": ["适用领域列表，* 表示全部"],
+        "reason": "为何需要这条 skill"
+    }
+    """
+    try:
+        data = json.loads(payload)
+    except Exception as e:
+        return f"失败：payload 非合法 JSON：{e}"
+    for k in ("name", "summary", "content"):
+        if not str(data.get(k, "")).strip():
+            return f"失败：缺少字段 {k}"
+    name = data["name"].strip()
+    if not name.replace("_", "").isalnum():
+        return f"失败：name 必须是合法标识符，收到 {name!r}"
+    domains = data.get("domains") or ["*"]
+    if not isinstance(domains, list):
+        return "失败：domains 必须是列表"
+    _proposals.append({
+        "kind": "create_skill",
+        "name": name,
+        "summary": data["summary"].strip(),
+        "triggers": (data.get("triggers") or "").strip(),
+        "content": data["content"],
+        "domains": domains,
+        "reason": data.get("reason", ""),
+    })
+    return f"OK：新增 Skill 提案已记录（{name}，当前共 {len(_proposals)} 条）"
+
+
+@tool("read_skills")
+def read_skills(_: str = "") -> str:
+    """读取当前已注册的 Skill 列表（含命中次数）。无需输入参数。
+    用于判断某领域是否已有覆盖的 skill，避免重复创建。"""
+    from core.skill_registry import list_skills
+    items = list_skills(only_enabled=False)
+    if not items:
+        return "(暂无 Skill)"
+    lines = []
+    for s in items:
+        flag = "" if s.get("enabled") else "[禁用]"
+        lines.append(
+            f"- {s['name']} {flag} (命中{s.get('hit_count', 0)}): {s.get('summary', '')} | domains={s.get('domains')}"
+        )
+    return "\n".join(lines)
+
+
 @tool("finalize")
 def finalize(summary: str = "") -> str:
     """声明已完成所有提案。参数 summary 是对今日改动的一句话总结。调用此工具后请结束任务。"""
@@ -287,10 +345,12 @@ EVOLVER_TOOLS = [
     read_recent_evolve_reports,
     read_user_rules,
     read_agents,
+    read_skills,
     propose_edit,
     propose_add_rule,
     propose_remove_rule,
     propose_create_tool,
+    propose_create_skill,
     propose_split_agent,
     finalize,
 ]
