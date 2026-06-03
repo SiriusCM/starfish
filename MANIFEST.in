@@ -6,5 +6,12 @@ include config/env.dev
 recursive-include script *.py
 recursive-include core *.py
 recursive-include evolver *.py
-recursive-include core *.py
-recursive-include evolver *.py
+
+# 前端资源
+include core/static/icon.png
+include core/vue/dist/index.html
+recursive-include core/vue/dist/assets *
+
+# 排除前端源码与开发依赖
+prune core/vue/node_modules
+exclude core/vue/package-lock.json

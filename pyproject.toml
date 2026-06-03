@@ -45,9 +45,9 @@ py-modules = ["app", "settings", "database"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["mcp_servers_standalone*", "mcp_servers*", "tests*", "dist*", "build*"]
+exclude = ["mcp_servers_standalone*", "mcp_servers*", "tests*", "dist*", "build*", "core.vue*"]
 
 [tool.setuptools.package-data]
 "*" = ["script/*.py", "CONSTITUTION.md"]
-"core" = ["static/*"]
+"core" = ["static/icon.png", "vue/dist/index.html", "vue/dist/assets/*"]
 "config" = ["env", "env.dev"]
