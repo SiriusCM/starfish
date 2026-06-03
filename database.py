@@ -33,7 +33,8 @@ def init_db():
             backstory TEXT NOT NULL,
             hit_count INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
-            parent TEXT
+            parent TEXT,
+            enabled INTEGER DEFAULT 1
         );
 
         -- 领域命中统计
@@ -87,6 +88,52 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        -- MCP 服务端配置（用户可在 UI 增删改启停）
+        -- transport: stdio | sse
+        -- command/args: stdio 模式下的启动命令与参数（JSON 数组）
+        -- env: 注入子进程的环境变量（JSON 对象）
+        -- url: sse 模式下的服务地址
+        CREATE TABLE IF NOT EXISTS mcp_servers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            transport TEXT NOT NULL DEFAULT 'stdio',
+            command TEXT DEFAULT '',
+            args TEXT DEFAULT '[]',
+            env TEXT DEFAULT '{}',
+            url TEXT DEFAULT '',
+            enabled INTEGER DEFAULT 1,
+            description TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
+        -- Prompt 常量覆盖：仅覆盖 prompts.py 里的"纯文本常量"
+        -- key   : 常量名（如 PLANNER_ROLE / PLANNER_GOAL / TOOL_CATALOG / ...）
+        -- value : 覆盖文本；不在表中的 key 用 prompts.py 默认值
+        -- 不允许覆盖带 {xxx} 占位符的模板字符串（在 prompt_registry 白名单里限制）
+        CREATE TABLE IF NOT EXISTS prompt_overrides (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        -- Skill 配置（用户可在 UI 增删改启停）
+        -- name        : 唯一名称，作为 [SKILL]name[/SKILL] 的标识
+        -- summary     : 简短一句话描述，给 planner 看，用于决定是否激活
+        -- triggers    : 触发关键词（逗号分隔），辅助 planner 匹配
+        -- content     : 激活时注入到 executor prompt 的完整内容（Markdown）
+        -- domains     : 适用领域（JSON 数组），便于按 agent 范围过滤
+        CREATE TABLE IF NOT EXISTS skills (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            summary TEXT NOT NULL DEFAULT '',
+            triggers TEXT DEFAULT '',
+            content TEXT NOT NULL DEFAULT '',
+            domains TEXT NOT NULL DEFAULT '["*"]',
+            enabled INTEGER DEFAULT 1,
+            hit_count INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
     """)
 
     # 插入默认配置
@@ -94,6 +141,11 @@ def init_db():
         "INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
         ("split_threshold", "10")
     )
+
+    # ── 迁移：为老的 agents 表追加 enabled 字段（兼容旧版本） ──
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(agents)").fetchall()]
+    if "enabled" not in cols:
+        conn.execute("ALTER TABLE agents ADD COLUMN enabled INTEGER DEFAULT 1")
 
     # 插入默认通用助手（如果不存在）
     conn.execute("""

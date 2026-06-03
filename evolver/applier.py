@@ -24,6 +24,28 @@ def _apply_split_agents(split_proposals):
         })
 
 
+def _apply_create_skills(skill_proposals):
+    """将 create_skill 提案写入 skills 表（重名时更新）。"""
+    from core.skill_registry import add_skill, update_skill, get_by_name
+    from database import get_conn
+    for p in skill_proposals:
+        data = {
+            "name": p["name"],
+            "summary": p.get("summary", ""),
+            "triggers": p.get("triggers", ""),
+            "content": p.get("content", ""),
+            "domains": p.get("domains") or ["*"],
+            "enabled": 1,
+        }
+        # 重名→更新
+        with get_conn() as conn:
+            row = conn.execute("SELECT id FROM skills WHERE name=?", (data["name"],)).fetchone()
+        if row:
+            update_skill(row["id"], data)
+        else:
+            add_skill(data)
+
+
 def _apply_rule_updates(rule_proposals):
     from core.user_profile import save_rule, remove_rule
     from core.agent_registry import add_agent_rule, remove_agent_rule
@@ -158,6 +180,7 @@ def apply_proposals(proposals, dry_run: bool):
 
     rule_updates = []
     split_updates = []
+    skill_updates = []
 
     for p in proposals:
         f = p.get("file")
@@ -172,6 +195,10 @@ def apply_proposals(proposals, dry_run: bool):
             continue
         if kind == "split_agent":
             split_updates.append(p)
+            results.append({**p, "status": "ok"})
+            continue
+        if kind == "create_skill":
+            skill_updates.append(p)
             results.append({**p, "status": "ok"})
             continue
         f = p["file"]
@@ -215,6 +242,9 @@ def apply_proposals(proposals, dry_run: bool):
 
     if split_updates:
         _apply_split_agents(split_updates)
+
+    if skill_updates:
+        _apply_create_skills(skill_updates)
 
     ok, msg = _import_smoke(base_dir)
     if not ok:

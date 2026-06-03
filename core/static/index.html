@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starfish Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="header glass">
+        <h1><span>Starfish</span> Agent</h1>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button class="settings-btn" onclick="openSettings()" title="设置">&#9881;</button>
+            <button class="settings-btn" onclick="openMcp()" title="MCP 服务端">&#128268;</button>
+            <button class="settings-btn" onclick="openSkill()" title="Skill 配置">&#127919;</button>
+            <button class="settings-btn" onclick="openAgent()" title="Agent 配置">&#129302;</button>
+            <button class="settings-btn" onclick="openPrompt()" title="Prompt 常量">&#128221;</button>
+            <button class="settings-btn" onclick="openTools()" title="工具列表（只读）">&#128296;</button>
+            <span class="header-info"><span class="status-dot"></span>在线</span>
+        </div>
+    </header>
+
+    <div class="control-toggle">
+        <button class="toggle-btn glass" onclick="togglePanel()">
+            <span id="toggleIcon">&#9660;</span> 控制面板
+        </button>
+    </div>
+
+    <div class="control-panel glass" id="controlPanel">
+        <div class="control-inner">
+            <div class="btn-group">
+                <button class="btn btn-evolve" onclick="doEvolve(false)" id="btn-evolve">&#128260; 预览</button>
+                <button class="btn btn-apply" onclick="doEvolve(true)" id="btn-apply">&#10004; 执行</button>
+                <button class="btn btn-snapshot" onclick="takeSnapshot()">&#128247; 快照</button>
+                <button class="btn btn-rollback" onclick="doRollback()">&#8617; 回滚</button>
+            </div>
+            <div class="snapshot-section">
+                <div class="snapshot-label">选择快照后点击回滚</div>
+                <div class="snapshot-list" id="snapshotList">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer">
+        <div class="message assistant">
+            你好！我是 Starfish Agent，随时为你效劳。
+            <span class="time" id="welcomeTime"></span>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="input-wrapper glass">
+            <input type="text" id="userInput" placeholder="输入消息..." onkeypress="handleKey(event)">
+            <button class="send-btn" onclick="send()" id="sendBtn">&#10148;</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- 设置弹窗 -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeSettingsOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">LLM 设置</div>
+                <button class="modal-close" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>模型名称 (LLM_MODEL)</label>
+                <input type="text" id="settingModel" placeholder="例如: gpt-4">
+            </div>
+            <div class="form-group">
+                <label>API 地址 (LLM_BASE_URL)</label>
+                <input type="text" id="settingBaseUrl" placeholder="例如: https://api.openai.com/v1">
+            </div>
+            <div class="form-group">
+                <label>API 密钥 (LLM_API_KEY)</label>
+                <input type="password" id="settingApiKey" placeholder="your-api-key">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="closeSettings()">取消</button>
+                <button class="modal-btn modal-btn-primary" onclick="saveSettings()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MCP 服务端管理弹窗 -->
+    <div class="modal-overlay" id="mcpModal" onclick="closeMcpOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">MCP 服务端</div>
+                <button class="modal-close" onclick="closeMcp()">&times;</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <button class="modal-btn modal-btn-primary" onclick="showMcpForm()">+ 新增</button>
+                <button class="modal-btn modal-btn-secondary" onclick="reloadMcp()">重新连接</button>
+                <button class="modal-btn modal-btn-secondary" onclick="loadMcpTools()">查看已加载工具</button>
+            </div>
+
+            <div id="mcpList" style="max-height:300px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;">
+                加载中...
+            </div>
+
+            <div id="mcpTools" style="margin-top:12px;color:#555;font-size:13px;"></div>
+
+            <div id="mcpForm" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px;">
+                <input type="hidden" id="mcpFormId" value="">
+                <div class="form-group">
+                    <label>名称（唯一）</label>
+                    <input type="text" id="mcpName" placeholder="例如: mysql-local">
+                </div>
+                <div class="form-group">
+                    <label>传输协议</label>
+                    <select id="mcpTransport" onchange="onMcpTransportChange()">
+                        <option value="http">http (推荐)</option>
+                        <option value="stdio">stdio</option>
+                    </select>
+                </div>
+                <div class="form-group" id="mcpUrlGroup">
+                    <label>服务地址（url，http 协议必填）</label>
+                    <input type="text" id="mcpUrl" placeholder="例如: http://localhost:8801/mcp">
+                </div>
+                <div class="form-group" id="mcpCmdGroup">
+                    <label>启动命令（command，stdio 协议必填）</label>
+                    <input type="text" id="mcpCommand" placeholder="例如: python">
+                </div>
+                <div class="form-group" id="mcpArgsGroup">
+                    <label>启动参数（args，JSON 数组，stdio 用）</label>
+                    <input type="text" id="mcpArgs" placeholder='例如: ["/abs/path/mysql_server.py"]'>
+                </div>
+                <div class="form-group">
+                    <label>环境变量（env，JSON 对象）</label>
+                    <input type="text" id="mcpEnv" placeholder='例如: {"MYSQL_HOST":"127.0.0.1"}'>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <input type="text" id="mcpDesc" placeholder="可选">
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <label style="margin:0;">启用</label>
+                    <input type="checkbox" id="mcpEnabled" checked>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-secondary" onclick="cancelMcpForm()">取消</button>
+                    <button class="modal-btn modal-btn-primary" onclick="saveMcp()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Skill 配置弹窗 -->
+    <div class="modal-overlay" id="skillModal" onclick="closeSkillOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">Skill 配置</div>
+                <button class="modal-close" onclick="closeSkill()">&times;</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <button class="modal-btn modal-btn-primary" onclick="showSkillForm()">+ 新增</button>
+                <button class="modal-btn modal-btn-secondary" onclick="document.getElementById('skillImportFile').click()">导入 ZIP</button>
+                <label style="display:flex;align-items:center;gap:4px;color:#666;font-size:12px;">
+                    <input type="checkbox" id="skillImportOverwrite"> 同名覆盖
+                </label>
+                <input type="file" id="skillImportFile" accept=".zip" style="display:none;" onchange="importSkill(this)">
+                <span style="color:#888;font-size:12px;align-self:center;">Skill 是按需激活的"任务剧本"，命中后会被注入到执行者的 prompt 中</span>
+            </div>
+
+            <div id="skillList" style="max-height:300px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;">
+                加载中...
+            </div>
+
+            <div id="skillForm" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px;">
+                <input type="hidden" id="skillFormId" value="">
+                <div class="form-group">
+                    <label>名称（唯一，英文/数字/下划线，AI 用它激活）</label>
+                    <input type="text" id="skillName" placeholder="例如: weekly_report">
+                </div>
+                <div class="form-group">
+                    <label>简介（一句话，planner 用它判断是否激活）</label>
+                    <input type="text" id="skillSummary" placeholder="例如: 生成本周工作周报">
+                </div>
+                <div class="form-group">
+                    <label>触发关键词（可选，逗号分隔）</label>
+                    <input type="text" id="skillTriggers" placeholder="例如: 周报,周总结,本周">
+                </div>
+                <div class="form-group">
+                    <label>适用领域（JSON 数组，* 表示全部）</label>
+                    <input type="text" id="skillDomains" placeholder='例如: ["*"] 或 ["编程","写作"]'>
+                </div>
+                <div class="form-group">
+                    <label>正文（激活时注入到执行者 prompt 的完整内容，支持 Markdown）</label>
+                    <textarea id="skillContent" rows="8" placeholder="例如：&#10;1. 先用 mysql_exec 查 last_week 表&#10;2. 按【方向/进展/计划】三段式总结&#10;3. 输出 Markdown 表格"></textarea>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <label style="margin:0;">启用</label>
+                    <input type="checkbox" id="skillEnabled" checked>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-secondary" onclick="cancelSkillForm()">取消</button>
+                    <button class="modal-btn modal-btn-primary" onclick="saveSkill()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent 配置弹窗 -->
+    <div class="modal-overlay" id="agentModal" onclick="closeAgentOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">Agent 配置</div>
+                <button class="modal-close" onclick="closeAgent()">&times;</button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                <button class="modal-btn modal-btn-primary" onclick="showAgentForm()">+ 新增</button>
+                <span style="color:#888;font-size:12px;align-self:center;">通用助手(general)不可删除或禁用</span>
+            </div>
+
+            <div id="agentList" style="max-height:300px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px;">
+                加载中...
+            </div>
+
+            <div id="agentForm" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px;">
+                <input type="hidden" id="agentFormMode" value="add">
+                <div class="form-group">
+                    <label>ID（snake_case，新增后不可改）</label>
+                    <input type="text" id="agentId" placeholder="例如: programming">
+                </div>
+                <div class="form-group">
+                    <label>名称</label>
+                    <input type="text" id="agentName" placeholder="例如: 编程助手">
+                </div>
+                <div class="form-group">
+                    <label>一句话描述</label>
+                    <input type="text" id="agentDesc" placeholder="例如: 处理代码相关问题">
+                </div>
+                <div class="form-group">
+                    <label>负责领域（JSON 数组，* 表示兜底）</label>
+                    <input type="text" id="agentDomains" placeholder='例如: ["编程"] 或 ["*"]'>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <input type="text" id="agentRole" placeholder="例如: 编程专家">
+                </div>
+                <div class="form-group">
+                    <label>Goal</label>
+                    <textarea id="agentGoal" rows="2" placeholder="智能体目标"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Backstory（描述其专业能力）</label>
+                    <textarea id="agentBackstory" rows="4" placeholder="背景故事"></textarea>
+                </div>
+                <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                    <label style="margin:0;">启用</label>
+                    <input type="checkbox" id="agentEnabled" checked>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-secondary" onclick="cancelAgentForm()">取消</button>
+                    <button class="modal-btn modal-btn-primary" onclick="saveAgent()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prompt 常量覆盖弹窗 -->
+    <div class="modal-overlay" id="promptModal" onclick="closePromptOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">Prompt 常量覆盖</div>
+                <button class="modal-close" onclick="closePrompt()">&times;</button>
+            </div>
+            <div style="color:#888;font-size:12px;margin-bottom:12px;">
+                这里只能覆盖 prompts.py 里的"纯文本常量"（如 PLANNER_GOAL / TOOL_CATALOG）。<br>
+                带 <code>{xxx}</code> 占位符的模板由代码契约管理，不开放编辑。<br>
+                清空保存即恢复默认值。
+            </div>
+            <div id="promptList" style="max-height:520px;overflow:auto;">加载中...</div>
+        </div>
+    </div>
+
+    <!-- 工具列表弹窗（只读） -->
+    <div class="modal-overlay" id="toolsModal" onclick="closeToolsOnOverlay(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;">
+            <div class="modal-header">
+                <div class="modal-title">工具列表（只读）</div>
+                <button class="modal-close" onclick="closeTools()">&times;</button>
+            </div>
+            <div style="color:#888;font-size:12px;margin-bottom:12px;">
+                这里展示 Agent 当前实际可调用的所有工具。<br>
+                · <b>内置工具</b>来自 <code>script/tools.py</code>，由 evolver 通过 <code>propose_create_tool</code> 自动新增<br>
+                · <b>MCP 工具</b>来自 🔌 配置的 MCP 服务端，启停在 MCP 弹窗里管理
+            </div>
+            <div id="toolsList" style="max-height:520px;overflow:auto;">加载中...</div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
+</html>
+</html>
+</html>
+</html>

@@ -8,17 +8,12 @@ from dotenv import load_dotenv
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(os.path.expanduser("~"), ".starfish")
 
-# env 加载优先级：用户目录 config/env > 包内 config/env.dev > 包内 config/env
+# env 加载：用户目录 ~/.starfish/config/env
 _user_config_dir = os.path.join(DATA_DIR, "config")
 _user_env = os.path.join(_user_config_dir, "env")
-_pkg_env_dev = os.path.join(PKG_DIR, "config", "env.dev")
 _pkg_env = os.path.join(PKG_DIR, "config", "env")
-_env_file = (
-    _user_env if os.path.exists(_user_env)
-    else _pkg_env_dev if os.path.exists(_pkg_env_dev)
-    else _pkg_env
-)
-load_dotenv(_env_file)
+if os.path.exists(_user_env):
+    load_dotenv(_user_env)
 
 LLM_MODEL = os.getenv("LLM_MODEL", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")

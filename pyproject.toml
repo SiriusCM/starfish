@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "starfish-agent"
-version = "0.1.7"
+version = "0.2.3"
 description = "可自我进化的智能助手"
 readme = "README.md"
 license = {text = "MIT"}
@@ -25,9 +25,13 @@ classifiers = [
 dependencies = [
     "crewai>=0.80.0",
     "crewai-tools>=0.14.0",
-    "mcp>=1.0.0",
+    "mcp>=1.10.0",
     "python-dotenv>=1.0.0",
     "sentence-transformers>=2.2.0",
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
+    "PyQt6>=6.6.0",
+    "PyQt6-WebEngine>=6.6.0",
 ]
 
 [project.urls]
@@ -41,7 +45,9 @@ py-modules = ["app", "settings", "database"]
 
 [tool.setuptools.packages.find]
 where = ["."]
+exclude = ["mcp_servers_standalone*", "mcp_servers*", "tests*", "dist*", "build*"]
 
 [tool.setuptools.package-data]
 "*" = ["script/*.py", "CONSTITUTION.md"]
+"core" = ["static/*"]
 "config" = ["env", "env.dev"]

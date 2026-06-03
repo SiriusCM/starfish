@@ -59,6 +59,8 @@ def _render_proposals_md(results):
             lines.append(f"{i}. **remove_rule**  状态：`{st}`\n   规则：{p.get('rule','')}\n   原因：{reason}")
         elif kind == "split_agent":
             lines.append(f"{i}. **split_agent** `{p.get('id','')}`({p.get('name','')})  状态：`{st}`\n   domains：{p.get('domains','')}\n   parent：{p.get('parent','')}\n   原因：{reason}")
+        elif kind == "create_skill":
+            lines.append(f"{i}. **create_skill** `{p.get('name','')}`  状态：`{st}`\n   summary：{p.get('summary','')}\n   domains：{p.get('domains','')}\n   原因：{reason}")
         else:
             lines.append(f"{i}. **{kind}**  状态：`{st}`")
     return "\n".join(lines)
