@@ -329,18 +329,20 @@ body {
     color: #2d3436;
 }
 
-/* 弹窗遮罩 */
+/* 弹窗遮罩
+   注意：为修复 Windows 11 上 QtWebEngine 打开弹窗的闪烁问题，
+   这里不使用 backdrop-filter，仅用纯色半透明背景。
+   过去的 backdrop-filter + transform 动画会在 D3D 合成器上反复栅格化整层导致闪屏。 */
 .modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.3);
-    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,0.45);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 2000;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.18s ease-out;
 }
 
 .modal-overlay.show {
@@ -348,22 +350,26 @@ body {
     opacity: 1;
 }
 
-/* 弹窗 */
+/* 弹窗
+   1) 不在 .modal 上叠加 backdrop-filter（已被遮罩盖住，重复 blur 是性能黑洞）
+   2) will-change + translateZ(0) 强制独立合成层，动画期间不重排底图 */
 .modal {
-    background: rgba(255,255,255,0.9);
-    backdrop-filter: blur(20px);
+    background: rgba(255,255,255,0.96);
     border-radius: 24px;
     padding: 28px 32px;
     width: 420px;
     max-width: 90vw;
     box-shadow: 0 20px 60px rgba(0,0,0,0.15);
     border: 1px solid rgba(255,255,255,0.5);
-    transform: scale(0.9);
-    transition: transform 0.3s;
+    opacity: 0;
+    transform: translateZ(0) scale(0.96);
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+    will-change: opacity, transform;
 }
 
 .modal-overlay.show .modal {
-    transform: scale(1);
+    opacity: 1;
+    transform: translateZ(0) scale(1);
 }
 
 .modal-header {

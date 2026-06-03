@@ -5,6 +5,22 @@ import os
 import sys
 import threading
 
+
+# ── 平台特定的 QtWebEngine 渲染参数（必须在 QApplication 创建之前设置） ──
+# Windows 11 上 QtWebEngine 的 D3D 合成器 + 多层 backdrop-filter blur 会导致弹窗闪烁。
+# 这里通过 Chromium flags 让 Skia 接管渲染并禁用强制 vsync，同时关闭 GPU 合成里
+# 已知会引发抖动的"线程化合成 + partial-raster"组合。
+if sys.platform.startswith("win"):
+    _flags = (
+        os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        + " --disable-gpu-vsync"
+        + " --disable-frame-rate-limit"
+        + " --enable-features=UseSkiaRenderer"
+        + " --disable-features=PaintHolding"
+    )
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = _flags.strip()
+
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import QUrl, pyqtSignal, QObject
 from PyQt6.QtWebEngineWidgets import QWebEngineView
