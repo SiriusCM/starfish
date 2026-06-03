@@ -48,7 +48,7 @@ where = ["."]
 exclude = ["mcp_servers_standalone*", "mcp_servers*", "tests*", "dist*", "build*"]
 
 [tool.setuptools.package-data]
-"*" = ["script/*.py", "CONSTITUTION.md"]
-"core" = ["static/icon.png"]
-"vue" = ["index.html", "package.json", "vite.config.js", "src/**/*", "public/**/*"]
-"config" = ["env", "env.dev"]
+"*" = ["CONSTITUTION.md", "assets/*", "config/*",
+         "vue/dist", "vue/dist/assets",
+         "vue/index.html", "vue/package.json", "vue/vite.config.js",
+         "vue/src", "vue/src/components", "vue/src/styles"]

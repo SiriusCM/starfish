@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api.js'
 import AppDialog from './AppDialog.vue'
@@ -96,6 +96,9 @@ function shortDesc(desc) {
 function isLong(desc) {
     return (desc || '').replace(/\s+/g, ' ').trim().length > 80
 }
+
+// 确保对话框打开时触发一次加载（处理组件挂载时 modelValue 已是 true 的情况）
+onMounted(() => { if (props.modelValue) open() })
 
 watch(() => props.modelValue, (v) => {
     if (v) open()

@@ -14,6 +14,7 @@ export const api = {
     chat: (message, signal) => jsonFetch('/api/chat', {
         method: 'POST', body: JSON.stringify({ message }), signal,
     }),
+    chatHistory: () => jsonFetch('/api/chat/history'),
 
     // 进化 / 快照
     evolve: (apply) => jsonFetch('/api/evolve', {

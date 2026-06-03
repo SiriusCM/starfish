@@ -49,7 +49,7 @@ def main():
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "web":
-        from server import run_server
+        from web import run_server
         print("🌐 启动 Web 服务: http://localhost:8765")
         print("   按 Ctrl+C 停止服务")
         run_server(host="0.0.0.0", port=8765)

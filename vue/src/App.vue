@@ -118,7 +118,29 @@ async function doRollback() {
     } catch { ElMessage.error('请求失败') }
 }
 
-onMounted(scrollBottom)
+async function loadHistory() {
+    try {
+        const d = await api.chatHistory()
+        if (d.success && d.history.length > 0) {
+            messages.value = []
+            d.history.forEach(h => {
+                messages.value.push({
+                    type: 'user',
+                    content: h.user,
+                    time: new Date(h.time).toLocaleTimeString(),
+                })
+                messages.value.push({
+                    type: h.isError ? 'error' : 'assistant',
+                    content: h.assistant,
+                    time: new Date(h.time).toLocaleTimeString(),
+                })
+            })
+            scrollBottom()
+        }
+    } catch { /* ignore */ }
+}
+
+onMounted(() => { scrollBottom(); loadHistory() })
 </script>
 
 <template>

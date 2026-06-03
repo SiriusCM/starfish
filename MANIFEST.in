@@ -1,14 +1,10 @@
 include CONSTITUTION.md
 include README.md
 include LICENSE
+include assets/icon.png
 include config/env
-include config/env.dev
 recursive-include script *.py
 recursive-include core *.py
 recursive-include evolver *.py
-
-# 前端资源（vue 源码 + 已构建产物）
-include core/static/icon.png
 recursive-include vue *
 prune vue/node_modules
-exclude vue/package-lock.json
