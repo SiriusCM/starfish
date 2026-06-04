@@ -3,6 +3,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+.idea/
 
 # 前端构建相关
 /view/node_modules/
@@ -12,4 +13,4 @@ dist/
 /view/yarn-debug.log*
 /view/yarn-error.log*
 
-.DS_Store
+.DS_Store.idea/
