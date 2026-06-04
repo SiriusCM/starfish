@@ -27,16 +27,16 @@ def chat():
 
 @bp.route("/chat/history", methods=["GET"])
 def chat_history():
-    """获取聊天历史"""
+    """获取聊天历史（含系统消息）"""
     try:
         from database import get_conn
         conn = get_conn()
         rows = conn.execute(
-            "SELECT user_input, answer, is_error, created_at FROM chat_logs ORDER BY id"
+            "SELECT user_input, answer, is_error, msg_type, created_at FROM chat_logs ORDER BY id"
         ).fetchall()
         conn.close()
         items = [
-            {"user": r["user_input"], "assistant": r["answer"], "isError": bool(r["is_error"]), "time": r["created_at"]}
+            {"user": r["user_input"], "assistant": r["answer"], "isError": bool(r["is_error"]), "msgType": r["msg_type"], "time": r["created_at"]}
             for r in rows
         ]
         return jsonify({"success": True, "history": items})
@@ -51,6 +51,13 @@ def api_evolve():
     apply = bool(data.get("apply", False))
     try:
         result = evolve(dry_run=not apply)
+        # 进化报告存入聊天记录（系统消息）
+        from core.chat_log import write_chat_log
+        write_chat_log(
+            user="[进化模拟报告]" if not apply else "[进化应用报告]",
+            answer=result["report"],
+            msg_type="system",
+        )
         return jsonify({"success": True, "apply": apply, **result})
     except Exception as e:
         return jsonify({"success": False, "detail": f"Evolve error: {str(e)}"}), 500

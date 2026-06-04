@@ -68,12 +68,7 @@ export const api = {
         method: 'POST', body: JSON.stringify({ enabled }),
     }),
 
-    // Prompt
-    promptList:  () => jsonFetch('/api/prompts'),
-    promptSet:   (key, value) => jsonFetch(`/api/prompts/${key}`, { method: 'PUT', body: JSON.stringify({ value }) }),
-    promptReset: (key) => jsonFetch(`/api/prompts/${key}`, { method: 'DELETE' }),
 
-    // Tools
     tools: () => jsonFetch('/api/tools'),
     toolsBuiltin: () => jsonFetch('/api/tools/builtin'),
     toolsMcp: (force = false) => jsonFetch('/api/tools/mcp' + (force ? '?force=1' : '')),

@@ -2,7 +2,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-    Setting, Connection, Aim, User, Document, Tools, Promotion, VideoPause,
+    Setting, Connection, Aim, User, Tools, Promotion, VideoPause,
     ArrowDown, ArrowUp, RefreshLeft, Check, Camera, Back,
 } from '@element-plus/icons-vue'
 import { api } from './api.js'
@@ -10,7 +10,6 @@ import SettingsDialog from './components/SettingsDialog.vue'
 import McpDialog from './components/McpDialog.vue'
 import SkillDialog from './components/SkillDialog.vue'
 import AgentDialog from './components/AgentDialog.vue'
-import PromptDialog from './components/PromptDialog.vue'
 import ToolsDialog from './components/ToolsDialog.vue'
 
 const messages = ref([
@@ -31,7 +30,6 @@ const showSettings = ref(false)
 const showMcp = ref(false)
 const showSkill = ref(false)
 const showAgent = ref(false)
-const showPrompt = ref(false)
 const showTools = ref(false)
 
 function now() { return new Date().toLocaleTimeString() }
@@ -130,16 +128,26 @@ async function loadHistory() {
         if (d.success && d.history.length > 0) {
             messages.value = []
             d.history.forEach(h => {
-                messages.value.push({
-                    type: 'user',
-                    content: h.user,
-                    time: new Date(h.time).toLocaleTimeString(),
-                })
-                messages.value.push({
-                    type: h.isError ? 'error' : 'assistant',
-                    content: h.assistant,
-                    time: new Date(h.time).toLocaleTimeString(),
-                })
+                if (h.msgType === 'system') {
+                    // 系统消息（进化报告等）
+                    messages.value.push({
+                        type: 'system',
+                        content: h.assistant,
+                        time: new Date(h.time).toLocaleTimeString(),
+                    })
+                } else {
+                    // 普通对话
+                    messages.value.push({
+                        type: 'user',
+                        content: h.user,
+                        time: new Date(h.time).toLocaleTimeString(),
+                    })
+                    messages.value.push({
+                        type: h.isError ? 'error' : 'assistant',
+                        content: h.assistant,
+                        time: new Date(h.time).toLocaleTimeString(),
+                    })
+                }
             })
             scrollBottom()
         }
@@ -158,7 +166,6 @@ onMounted(() => { scrollBottom(); loadHistory() })
                 <el-button text circle :icon="Connection" title="MCP 服务端"  @click="showMcp = true" />
                 <el-button text circle :icon="Aim"        title="Skill 配置" @click="showSkill = true" />
                 <el-button text circle :icon="User"       title="Agent 配置" @click="showAgent = true" />
-                <el-button text circle :icon="Document"   title="Prompt 常量" @click="showPrompt = true" />
                 <el-button text circle :icon="Tools"      title="工具列表"   @click="showTools = true" />
                 <span class="header-info"><span class="status-dot"></span>在线</span>
             </div>
@@ -233,7 +240,6 @@ onMounted(() => { scrollBottom(); loadHistory() })
         <McpDialog      v-model="showMcp" />
         <SkillDialog    v-model="showSkill" />
         <AgentDialog    v-model="showAgent" />
-        <PromptDialog   v-model="showPrompt" />
         <ToolsDialog    v-model="showTools" />
     </div>
 </template>

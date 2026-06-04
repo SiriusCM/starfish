@@ -53,7 +53,6 @@ from api.snapshot import bp as snapshot_bp
 from api.settings import bp as settings_bp
 from api.skills import bp as skills_bp
 from api.agents import bp as agents_bp
-from api.prompts import bp as prompts_bp
 
 app.register_blueprint(chat_bp)
 app.register_blueprint(snapshot_bp)
@@ -62,7 +61,6 @@ app.register_blueprint(mcp_module.bp)
 app.register_blueprint(mcp_module._tools_bp)   # /api/tools/* 独立蓝图
 app.register_blueprint(skills_bp)
 app.register_blueprint(agents_bp)
-app.register_blueprint(prompts_bp)
 
 
 # ── MCP 预热 + 启动入口 ─────────────────────────────

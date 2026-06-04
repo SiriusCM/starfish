@@ -61,27 +61,6 @@ def read_all_log(_: str = "") -> str:
     return get_all_hints()
 
 
-@tool("read_recent_evolve_reports")
-def read_recent_evolve_reports(n: str = "3") -> str:
-    """读取最近 N 份进化报告。参数 n 默认 '3'。"""
-    from database import get_conn
-    try:
-        k = int(str(n).strip() or 3)
-    except Exception:
-        k = 3
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT report, created_at FROM evolve_reports ORDER BY id DESC LIMIT ?", (k,)
-    ).fetchall()
-    conn.close()
-    if not rows:
-        return "(无报告)"
-    parts = []
-    for r in rows:
-        parts.append(f"========== {r['created_at'][:10]} ==========\n{r['report']}")
-    return "\n\n".join(parts)
-
-
 @tool("propose_edit")
 def propose_edit(payload: str) -> str:
     """提交一条修改提案（不立即写盘，由框架统一应用）。
@@ -341,7 +320,6 @@ EVOLVER_TOOLS = [
     list_script_files,
     read_script_file,
     read_all_log,
-    read_recent_evolve_reports,
     read_user_rules,
     read_agents,
     read_skills,

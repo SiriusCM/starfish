@@ -15,6 +15,8 @@ EVOLVER_BACKSTORY = (
 
 EVOLVER_TASK_TEMPLATE = """请完成 Agent 自我进化。
 
+{context}
+
 执行步骤：
 1. 调用 read_all_log 阅读所有进化摘要。逐条分析，自主判断：
    - Agent 回答是否正确？是否答非所问、牵强附会、遗漏关键信息？
@@ -23,10 +25,9 @@ EVOLVER_TASK_TEMPLATE = """请完成 Agent 自我进化。
    - 用户是否表达了某种偏好？
    - 用户反复采用的操作模式是什么？
 2. 调用 read_user_rules 查看已有规则，避免重复添加。
-3. 调用 read_skills 查看已有 Skill，避免重复创建。
-4. 调用 read_recent_evolve_reports 查看最近进化报告，避免重复修改。
-5. 调用 read_agents 查看当前智能体列表和领域统计，评估是否需要裂变。
-6. 必要时调用 read_script_file 阅读源码。
+3. 调用 read_skills 查看已有 Skill，对照上方【已有 Skill】，避免重复创建。
+4. 调用 read_agents 查看当前智能体列表，对照上方【已有智能体】，评估是否需要裂变。
+5. 必要时调用 read_script_file 阅读源码。
 7. 基于证据提交提案，调用 finalize 结束。
 
 提案类型与适用场景（按优先级排序）：

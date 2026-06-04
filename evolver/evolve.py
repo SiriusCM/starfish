@@ -53,28 +53,41 @@ def _render_proposals_md(results):
     return "\n".join(lines)
 
 
-def _write_report(today, summary, results, decision, notes):
-    """将进化报告写入数据库。"""
-    from database import get_conn
-    md = EP.REPORT_TEMPLATE.format(
-        today=today,
-        summary=summary or "(无)",
-        proposals_md=_render_proposals_md(results),
-        phase=decision.get("phase", ""),
-        result_msg=decision.get("msg", ""),
-        applied_to_disk=str(decision.get("applied_to_disk", False)),
-        snapshot=decision.get("snapshot") or "(无)",
-        rolled_back=str(decision.get("rolled_back", False)),
-        notes=notes or "(无)",
-    )
-    conn = get_conn()
-    conn.execute(
-        "INSERT INTO evolve_reports (report, created_at) VALUES (?, ?)",
-        (md, datetime.now().isoformat())
-    )
-    conn.commit()
-    conn.close()
-    return f"[已存入数据库] evolve-{today}"
+def _get_evolver_context() -> str:
+    """生成当前系统状态摘要（工具/技能/智能体），注入到 evolver 任务模板。"""
+    from core.registry.tool_catalog_registry import build_tool_catalog_text
+    from core.registry.skill_registry import list_skills
+    from core.registry.agent_registry import list_agents
+
+    tools_text = build_tool_catalog_text()
+    skills = list_skills(only_enabled=False)
+    agents = list_agents()
+
+    skill_lines = []
+    if skills:
+        for s in skills:
+            flag = "[禁用]" if not s.get("enabled") else ""
+            skill_lines.append(f"  - {s['name']} {flag}: {s.get('summary','')}")
+    else:
+        skill_lines.append("  (无)")
+
+    agent_lines = []
+    for a in agents:
+        agent_lines.append(
+            f"  - {a['id']}({a['name']}): {a.get('description','')}, hit={a.get('hit_count',0)}"
+        )
+
+    return f"""【当前系统状态】
+
+### 内置工具
+{tools_text}
+
+### 已有 Skill
+{chr(10).join(skill_lines)}
+
+### 已有智能体
+{chr(10).join(agent_lines)}
+"""
 
 
 def evolve(dry_run: bool = True) -> dict:
@@ -83,22 +96,23 @@ def evolve(dry_run: bool = True) -> dict:
     dry_run=True 时：仅模拟，报告内容会返回给前端展示
     dry_run=False 时：实际应用，报告存库后返回路径
     返回 dict：{
-        "report_path": str,       # 报告标识
+        "report_path": str,
         "report": str,            # 完整 Markdown 报告内容
-        "proposals": int,         # 提案数量
-        "applied": int,           # 成功数量
-        "failed": int,            # 失败数量
-        "applied_to_disk": bool,   # 是否写盘
-        "snapshot": str|None,     # 快照名
-        "msg": str,               # 阶段说明
+        "proposals": int,
+        "applied": int,
+        "failed": int,
+        "applied_to_disk": bool,
+        "snapshot": str|None,
+        "msg": str,
     }
     """
     from core.chat_log import get_all_hints, clear_all_hints
     today = _today()
     reset_proposals()
     evolver = _build_evolver_agent()
+    context = _get_evolver_context()
     task = Task(
-        description=EP.EVOLVER_TASK_TEMPLATE,
+        description=EP.EVOLVER_TASK_TEMPLATE.format(context=context),
         expected_output="调用 finalize 工具后，返回其结果字符串作为总结。",
         agent=evolver,
     )
@@ -134,26 +148,17 @@ def evolve(dry_run: bool = True) -> dict:
         notes=notes or "(无)",
     )
 
-    if not dry_run:
-        # 执行模式才写库，预览不写库
-        report_path = _write_report(today, summary, results, decision, notes)
-    else:
-        report_path = f"预览 {today}"
-
-    mode = "DRY-RUN" if dry_run else "APPLY"
     n = len(results)
     applied = sum(1 for p in results if p.get("status") == "ok")
     failed = n - applied
-    print(f"✅ 进化完成 [{mode}]")
+    print(f"✅ 进化完成 [{'DRY-RUN' if dry_run else 'APPLY'}]")
     print(f"   提案 : {n} 条（ok {applied} / 其他 {failed}）")
     print(f"   阶段 : {decision.get('phase')}  写盘 : {decision.get('applied_to_disk')}  快照 : {decision.get('snapshot') or '-'}  回滚 : {decision.get('rolled_back')}")
     if decision.get("msg"):
         print(f"   说明 : {decision.get('msg')}")
-    print(f"   报告 : {report_path}")
     if dry_run and n > 0:
         print("👉 确认无误后执行：starfish evolve --apply")
     return {
-        "report_path": report_path,
         "report": md,
         "proposals": n,
         "applied": applied,

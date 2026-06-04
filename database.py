@@ -59,12 +59,13 @@ def init_db():
             UNIQUE(agent_id, rule)
         );
 
-        -- 对话日志
+        -- 对话日志（msg_type: chat=普通对话, system=系统消息如进化报告）
         CREATE TABLE IF NOT EXISTS chat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_input TEXT NOT NULL,
             answer TEXT NOT NULL,
             is_error INTEGER DEFAULT 0,
+            msg_type TEXT NOT NULL DEFAULT 'chat',
             created_at TEXT NOT NULL
         );
 
@@ -73,13 +74,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_input TEXT NOT NULL,
             hint TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        );
-
-        -- 进化报告
-        CREATE TABLE IF NOT EXISTS evolve_reports (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            report TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
 
@@ -105,16 +99,6 @@ def init_db():
             enabled INTEGER DEFAULT 1,
             description TEXT DEFAULT '',
             created_at TEXT NOT NULL
-        );
-
-        -- Prompt 常量覆盖：仅覆盖 prompts.py 里的"纯文本常量"
-        -- key   : 常量名（如 PLANNER_ROLE / PLANNER_GOAL / TOOL_CATALOG / ...）
-        -- value : 覆盖文本；不在表中的 key 用 prompts.py 默认值
-        -- 不允许覆盖带 {xxx} 占位符的模板字符串（在 prompt_registry 白名单里限制）
-        CREATE TABLE IF NOT EXISTS prompt_overrides (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TEXT NOT NULL
         );
 
         -- Skill 配置（用户可在 UI 增删改启停）
@@ -155,6 +139,11 @@ def init_db():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(agents)").fetchall()]
     if "enabled" not in cols:
         conn.execute("ALTER TABLE agents ADD COLUMN enabled INTEGER DEFAULT 1")
+
+    # ── 迁移：为老的 chat_logs 表追加 msg_type 字段（兼容旧版本） ──
+    chat_cols = [r[1] for r in conn.execute("PRAGMA table_info(chat_logs)").fetchall()]
+    if "msg_type" not in chat_cols:
+        conn.execute("ALTER TABLE chat_logs ADD COLUMN msg_type TEXT NOT NULL DEFAULT 'chat'")
 
     # 插入默认通用助手（如果不存在）
     conn.execute("""

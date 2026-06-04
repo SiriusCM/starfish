@@ -14,12 +14,12 @@ def append_history(user, answer):
         del _history[: len(_history) - MAX_HISTORY]
 
 
-def write_chat_log(user, answer, error=False):
-    """记录一条对话日志到数据库。"""
+def write_chat_log(user, answer, error=False, msg_type="chat"):
+    """记录一条对话日志到数据库。msg_type: chat=普通, system=系统消息"""
     conn = get_conn()
     conn.execute(
-        "INSERT INTO chat_logs (user_input, answer, is_error, created_at) VALUES (?, ?, ?, ?)",
-        (user, answer, 1 if error else 0, datetime.now().isoformat())
+        "INSERT INTO chat_logs (user_input, answer, is_error, msg_type, created_at) VALUES (?, ?, ?, ?, ?)",
+        (user, answer, 1 if error else 0, msg_type, datetime.now().isoformat())
     )
     conn.commit()
     conn.close()
