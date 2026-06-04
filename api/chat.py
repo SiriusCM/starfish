@@ -51,6 +51,6 @@ def api_evolve():
     apply = bool(data.get("apply", False))
     try:
         result = evolve(dry_run=not apply)
-        return jsonify({"success": True, "apply": apply, "result": result})
+        return jsonify({"success": True, "apply": apply, **result})
     except Exception as e:
         return jsonify({"success": False, "detail": f"Evolve error: {str(e)}"}), 500

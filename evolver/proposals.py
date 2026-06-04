@@ -54,11 +54,11 @@ def read_script_file(filename: str) -> str:
 
 
 
-@tool("read_today_log")
-def read_today_log(_: str = "") -> str:
-    """读取今日的进化摘要（已脱敏，不含原始对话）。无需输入参数。"""
-    from core.chat_log import get_today_hints
-    return get_today_hints()
+@tool("read_all_log")
+def read_all_log(_: str = "") -> str:
+    """读取所有进化摘要（已脱敏，不含原始对话）。无需输入参数。"""
+    from core.chat_log import get_all_hints
+    return get_all_hints()
 
 
 @tool("read_recent_evolve_reports")
@@ -333,14 +333,14 @@ def read_skills(_: str = "") -> str:
 
 @tool("finalize")
 def finalize(summary: str = "") -> str:
-    """声明已完成所有提案。参数 summary 是对今日改动的一句话总结。调用此工具后请结束任务。"""
+    """声明已完成所有提案。参数 summary 是对改动的一句话总结。调用此工具后请结束任务。"""
     return f"FINALIZED：共 {len(_proposals)} 条提案待框架应用。总结：{summary or '(无)'}"
 
 
 EVOLVER_TOOLS = [
     list_script_files,
     read_script_file,
-    read_today_log,
+    read_all_log,
     read_recent_evolve_reports,
     read_user_rules,
     read_agents,

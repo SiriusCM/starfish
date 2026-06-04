@@ -81,12 +81,18 @@ async function loadSnapshots() {
 }
 
 async function doEvolve(apply) {
-    ElMessage.info(apply ? '执行进化中...' : '预览进化中...')
+    ElMessage.info(apply ? '应用进化中...' : '模拟进化中...')
     try {
         const d = await api.evolve(apply)
         if (d.success) {
-            ElMessage.success(apply ? '进化已执行' : '预览完成')
-            addMsg('system', apply ? '进化执行完成' : '进化预览完成')
+            if (apply) {
+                ElMessage.success('进化应用完成')
+                addMsg('system', '✅ 进化应用完成')
+            } else {
+                // 预览：将报告内容作为 AI 回复展示
+                ElMessage.success('模拟进化完成')
+                addMsg('assistant', `## 🧠 进化模拟报告\n\n${d.report || '(无提案)'}`)
+            }
         } else ElMessage.error('操作失败')
     } catch (e) { ElMessage.error('请求失败: ' + e.message) }
 }
@@ -168,10 +174,10 @@ onMounted(() => { scrollBottom(); loadHistory() })
         <div class="control-panel glass" :class="{ expanded: panelExpanded }">
             <div class="control-inner">
                 <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:16px;">
-                    <el-button type="success" :icon="RefreshLeft" @click="doEvolve(false)">预览</el-button>
-                    <el-button type="primary" :icon="Check"       @click="doEvolve(true)">执行</el-button>
-                    <el-button type="danger"  :icon="Camera"      @click="takeSnapshot">快照</el-button>
-                    <el-button type="warning" :icon="Back"        @click="doRollback">回滚</el-button>
+                    <el-button type="success" :icon="RefreshLeft" @click="doEvolve(false)">模拟进化（不写入）</el-button>
+                    <el-button type="primary" :icon="Check"       @click="doEvolve(true)">应用进化（写入代码）</el-button>
+                    <el-button type="danger"  :icon="Camera"      @click="takeSnapshot">创建快照</el-button>
+                    <el-button type="warning" :icon="Back"        @click="doRollback">回滚到快照</el-button>
                 </div>
                 <div class="snapshot-section">
                     <div class="snapshot-label">选择快照后点击回滚</div>

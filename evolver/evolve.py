@@ -11,19 +11,6 @@ def _today():
     return datetime.now().strftime("%Y-%m-%d")
 
 
-def _has_today_log():
-    """检查今日是否有进化摘要（从数据库查询）。"""
-    from database import get_conn
-    today = _today()
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT COUNT(*) as cnt FROM evolve_hints WHERE created_at LIKE ?",
-        (f"{today}%",)
-    ).fetchone()
-    conn.close()
-    return row["cnt"] > 0
-
-
 def _build_evolver_agent():
     llm = LLM(model=LLM_MODEL, base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
     return Agent(
@@ -90,11 +77,24 @@ def _write_report(today, summary, results, decision, notes):
     return f"[已存入数据库] evolve-{today}"
 
 
-def evolve(dry_run: bool = True) -> str:
+def evolve(dry_run: bool = True) -> dict:
+    """
+    触发一次进化。
+    dry_run=True 时：仅模拟，报告内容会返回给前端展示
+    dry_run=False 时：实际应用，报告存库后返回路径
+    返回 dict：{
+        "report_path": str,       # 报告标识
+        "report": str,            # 完整 Markdown 报告内容
+        "proposals": int,         # 提案数量
+        "applied": int,           # 成功数量
+        "failed": int,            # 失败数量
+        "applied_to_disk": bool,   # 是否写盘
+        "snapshot": str|None,     # 快照名
+        "msg": str,               # 阶段说明
+    }
+    """
+    from core.chat_log import get_all_hints, clear_all_hints
     today = _today()
-    if not _has_today_log():
-        print(f"⚠️ 今日暂无进化摘要（请先进行对话）")
-        return ""
     reset_proposals()
     evolver = _build_evolver_agent()
     task = Task(
@@ -113,12 +113,33 @@ def evolve(dry_run: bool = True) -> str:
 
     proposals = get_proposals()
     if not proposals:
-        decision = {"phase": "no-op", "ok": True, "msg": "今日 evolver 未提交任何提案", "applied_to_disk": False, "snapshot": None, "rolled_back": False}
+        decision = {"phase": "no-op", "ok": True, "msg": "evolver 未提交任何提案", "applied_to_disk": False, "snapshot": None, "rolled_back": False}
         results = []
     else:
         results, decision = apply_proposals(proposals, dry_run=dry_run)
+        # 执行模式：应用后清空所有摘要
+        if not dry_run and decision.get("applied_to_disk"):
+            clear_all_hints()
 
-    report_path = _write_report(today, summary, results, decision, notes)
+    # 生成报告内容（无论 dry_run 还是 apply 都生成）
+    md = EP.REPORT_TEMPLATE.format(
+        today=today,
+        summary=summary or "(无)",
+        proposals_md=_render_proposals_md(results),
+        phase=decision.get("phase", ""),
+        result_msg=decision.get("msg", ""),
+        applied_to_disk=str(decision.get("applied_to_disk", False)),
+        snapshot=decision.get("snapshot") or "(无)",
+        rolled_back=str(decision.get("rolled_back", False)),
+        notes=notes or "(无)",
+    )
+
+    if not dry_run:
+        # 执行模式才写库，预览不写库
+        report_path = _write_report(today, summary, results, decision, notes)
+    else:
+        report_path = f"预览 {today}"
+
     mode = "DRY-RUN" if dry_run else "APPLY"
     n = len(results)
     applied = sum(1 for p in results if p.get("status") == "ok")
@@ -131,4 +152,13 @@ def evolve(dry_run: bool = True) -> str:
     print(f"   报告 : {report_path}")
     if dry_run and n > 0:
         print("👉 确认无误后执行：starfish evolve --apply")
-    return report_path
+    return {
+        "report_path": report_path,
+        "report": md,
+        "proposals": n,
+        "applied": applied,
+        "failed": failed,
+        "applied_to_disk": decision.get("applied_to_disk", False),
+        "snapshot": decision.get("snapshot"),
+        "msg": decision.get("msg", ""),
+    }
