@@ -12,7 +12,7 @@
 ## 安装
 
 ```bash
-pip install starfish-agent
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.tuna.tsinghua.edu.cn/simple/ starfish-agent
 ```
 
 或开发模式：
@@ -20,7 +20,7 @@ pip install starfish-agent
 ```bash
 git clone https://github.com/SiriusCM/starfish.git
 cd starfish
-pip install -e .
+pip3 install -e .
 ```
 
 ## 配置
@@ -37,7 +37,7 @@ LLM_API_KEY=your-api-key-here
 
 ```bash
 # 启动 Web 界面
-starfish api
+starfish web
 
 # 进入控制台对话模式
 starfish cli
