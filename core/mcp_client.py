@@ -3,12 +3,12 @@ MCP 客户端管理器
 ─────────────────
 职责：
   1. 启动一个常驻后台事件循环线程（loop_thread）
-  2. 为 mcp_registry.active_configs() 里每个启用的 server 建立 stdio 会话
+  2. 为 mcp_registry.active_configs() 里每个启用的 api 建立 stdio 会话
   3. list_tools() 后把每个工具包成 crewai 的 BaseTool 实例
   4. 同步 .run() 内部把调用桥接到后台事件循环，等待结果
   5. 注册表版本号变化时自动重建（懒重建：调用 get_tools() 时检查）
 
-异常容忍：单个 server 启动失败不会影响其它 server。
+异常容忍：单个 api 启动失败不会影响其它 api。
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ except ImportError as e:
 
 from crewai.tools import BaseTool
 
-from registry import mcp_registry
+from core.registry import mcp_registry
 
 
 # ── 后台事件循环线程 ──────────────────────────────────────
@@ -67,7 +67,7 @@ class _LoopThread:
 
 # ── 单个 MCP 会话的包装 ─────────────────────────────────
 class _Session:
-    """一个 MCP server 子进程 + ClientSession 的封装，跑在后台 loop 上。"""
+    """一个 MCP api 子进程 + ClientSession 的封装，跑在后台 loop 上。"""
 
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -90,7 +90,7 @@ class _Session:
             elif transport in ("http", "streamable-http", "streamable_http"):
                 url = self.cfg.get("url") or ""
                 if not url:
-                    raise ValueError("HTTP MCP server 必须提供 url")
+                    raise ValueError("HTTP MCP api 必须提供 url")
                 # streamablehttp_client 返回 (read, write, get_session_id)
                 ctx = await stack.enter_async_context(streamablehttp_client(url))
                 read, write = ctx[0], ctx[1]
@@ -224,7 +224,7 @@ class _Manager:
             try:
                 loop.run_coro(session.start(), timeout=self._timeout)
             except Exception as e:
-                print(f"[mcp] 启动 server '{cfg.get('name')}' 失败：{e}", file=sys.stderr)
+                print(f"[mcp] 启动 api '{cfg.get('name')}' 失败：{e}", file=sys.stderr)
                 continue
             self._sessions.append(session)
             for spec in session.tool_specs:
@@ -257,7 +257,7 @@ _manager = _Manager()
 
 # ── 对外 API ───────────────────────────────────────────
 def get_mcp_tools() -> list[BaseTool]:
-    """返回当前所有启用的 MCP server 暴露的 crewai 工具列表。"""
+    """返回当前所有启用的 MCP api 暴露的 crewai 工具列表。"""
     return _manager.get_tools()
 
 

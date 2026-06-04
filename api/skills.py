@@ -2,7 +2,7 @@
 Skill 增删改查、导入导出。
 """
 from flask import Blueprint, request, jsonify, Response
-from registry import skill_registry
+from core.registry import skill_registry
 
 bp = Blueprint("skills", __name__, url_prefix="/api/skills")
 

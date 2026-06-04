@@ -106,19 +106,19 @@ vue/
 ### 首次拉取代码后
 
 ```bash
-cd vue
+cd view
 npm install        # 安装依赖（node_modules，已在 .gitignore）
-npm run build      # 生成产物到 vue/dist/（已在 .gitignore）
+npm run build      # 生成产物到 view/dist/（已在 .gitignore）
 ```
 
 ### 开发模式（热更新）
 
 ```bash
 # 终端 1：启动后端
-python3 server.py
+python3 api.py
 
-# 终端 2：启动 Vite dev server
-cd vue
+# 终端 2：启动 Vite dev api
+cd view
 npm run dev               # http://localhost:5173
 # /api/* 自动代理到 http://127.0.0.1:8765
 ```

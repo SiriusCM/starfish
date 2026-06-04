@@ -2,7 +2,7 @@
 Agent 增删改查、启停。
 """
 from flask import Blueprint, request, jsonify
-from registry import agent_registry
+from core.registry import agent_registry
 
 bp = Blueprint("agents", __name__, url_prefix="/api/agents")
 

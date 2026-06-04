@@ -53,7 +53,7 @@ def _mcp_loader_worker():
                 "full_name": full,
                 "description": getattr(t, "description", "") or "",
                 "source": "mcp",
-                "server": server,
+                "api": server,
             })
         with MCP_LOCK:
             MCP_STATE["status"] = "ready"

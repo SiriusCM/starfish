@@ -1,6 +1,6 @@
 """
 Starfish HTTP Server - Flask 入口
-所有 API 路由拆分到 web/ 目录下，server.py 只做应用初始化和蓝图注册。
+所有 API 路由拆分到 api/ 目录下，api.py 只做应用初始化和蓝图注册。
 """
 import os
 from flask import Flask, jsonify, send_from_directory
@@ -12,7 +12,7 @@ from settings import init_data_dir
 init_data_dir()
 
 # ── Flask 应用 ──────────────────────────────────────
-WEB_DIST = os.path.join(os.path.dirname(__file__), "vue", "dist")
+WEB_DIST = os.path.join(os.path.dirname(__file__), "view", "dist")
 LEGACY_STATIC = os.path.join(os.path.dirname(__file__), "assets")
 os.makedirs(LEGACY_STATIC, exist_ok=True)
 
@@ -28,7 +28,7 @@ def root():
     if not os.path.exists(index_path):
         return (
             "<h2>前端尚未构建</h2>"
-            "<p>请先在 <code>vue/</code> 目录执行：</p>"
+            "<p>请先在 <code>view/</code> 目录执行：</p>"
             "<pre>npm install\nnpm run build</pre>",
             503,
         )
@@ -47,13 +47,13 @@ def health_check():
 
 
 # ── 注册蓝图 ────────────────────────────────────────
-from web.chat import bp as chat_bp
-from web.snapshot import bp as snapshot_bp
-from web.settings import bp as settings_bp
-from web import mcp as mcp_module
-from web.skills import bp as skills_bp
-from web.agents import bp as agents_bp
-from web.prompts import bp as prompts_bp
+from api.chat import bp as chat_bp
+import api.mcp as mcp_module
+from api.snapshot import bp as snapshot_bp
+from api.settings import bp as settings_bp
+from api.skills import bp as skills_bp
+from api.agents import bp as agents_bp
+from api.prompts import bp as prompts_bp
 
 app.register_blueprint(chat_bp)
 app.register_blueprint(snapshot_bp)
@@ -67,7 +67,7 @@ app.register_blueprint(prompts_bp)
 
 # ── MCP 预热 + 启动入口 ─────────────────────────────
 try:
-    from web.state import ensure_mcp_loading
+    from api.state import ensure_mcp_loading
     ensure_mcp_loading()
 except Exception:
     pass

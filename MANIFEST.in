@@ -6,5 +6,5 @@ include config/env
 recursive-include script *.py
 recursive-include core *.py
 recursive-include evolver *.py
-recursive-include vue *
-prune vue/node_modules
+recursive-include view *
+prune view/node_modules

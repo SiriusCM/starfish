@@ -134,6 +134,15 @@ def init_db():
             hit_count INTEGER DEFAULT 0,
             created_at TEXT NOT NULL
         );
+
+        -- 工具描述覆盖（仅追加，不覆盖已存在的工具描述）
+        CREATE TABLE IF NOT EXISTS tool_catalog (
+            name TEXT PRIMARY KEY,
+            description TEXT NOT NULL DEFAULT '',
+            api TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL
+        );
     """)
 
     # 插入默认配置

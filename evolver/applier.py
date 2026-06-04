@@ -4,11 +4,12 @@ import subprocess
 from datetime import datetime
 from .snapshot import take_snapshot, rollback
 from settings import SCRIPT_DIR, AGENT_BASE_DIR
+from core.registry import tool_catalog_registry
 
 
 def _apply_split_agents(split_proposals):
     """将裂变提案写入数据库。"""
-    from registry.agent_registry import add_agent
+    from core.registry.agent_registry import add_agent
     for p in split_proposals:
         add_agent({
             "id": p["id"],
@@ -24,7 +25,7 @@ def _apply_split_agents(split_proposals):
 
 def _apply_create_skills(skill_proposals):
     """将 create_skill 提案写入 skills 表（重名时更新）。"""
-    from registry.skill_registry import add_skill, update_skill
+    from core.registry.skill_registry import add_skill, update_skill
     from database import get_conn
     for p in skill_proposals:
         data = {
@@ -46,7 +47,7 @@ def _apply_create_skills(skill_proposals):
 
 def _apply_rule_updates(rule_proposals):
     from core.user_profile import save_rule, remove_rule
-    from registry.agent_registry import add_agent_rule, remove_agent_rule
+    from core.registry.agent_registry import add_agent_rule, remove_agent_rule
 
     for p in rule_proposals:
         agent_id = p.get("agent_id", "")
@@ -125,22 +126,6 @@ def _apply_create_tool(src: str, p):
     return new_src, "ok"
 
 
-def _apply_catalog_desc(src: str, desc: str):
-    marker = "TOOL_CATALOG = ("
-    if marker not in src:
-        return src, "tool_catalog_not_found"
-    i = src.find(marker)
-    j = src.find(")", i)
-    if j == -1:
-        return src, "tool_catalog_unclosed"
-    block = src[i:j]
-    if desc.strip() in block:
-        return src, "duplicate"
-    extra = f'\n    "{desc.replace(chr(34), chr(39))}"'
-    new_src = src[:j].rstrip() + extra + "\n" + src[j:]
-    return new_src, "ok"
-
-
 def _ast_check(path, text):
     try:
         ast.parse(text)
@@ -212,11 +197,13 @@ def apply_proposals(proposals, dry_run: bool):
             new_text, st = _apply_create_tool(files_text[f], p)
             if st == "ok":
                 files_text[f] = new_text
-                new_text2, st2 = _apply_catalog_desc(files_text["prompts.py"] if "prompts.py" in files_text else _read(os.path.join(SCRIPT_DIR, "prompts.py")), p["catalog_desc"])
-                if "prompts.py" not in files_text:
-                    files_text["prompts.py"] = _read(os.path.join(SCRIPT_DIR, "prompts.py"))
-                if st2 == "ok":
-                    files_text["prompts.py"] = new_text2
+            # 写数据库，不再改 prompts.py
+            tool_catalog_registry.add_tool(
+                name=p["name"],
+                description=p["catalog_desc"],
+                server="",
+                source="builtin",
+            )
             results.append({**p, "status": st})
         else:
             results.append({**p, "status": "unknown_kind"})

@@ -97,9 +97,10 @@ function isLong(desc) {
     return (desc || '').replace(/\s+/g, ' ').trim().length > 80
 }
 
-// 确保对话框打开时触发一次加载（处理组件挂载时 modelValue 已是 true 的情况）
-onMounted(() => { if (props.modelValue) open() })
+// 组件挂载时（dialog 首次打开）立即触发一次
+onMounted(() => open())
 
+// 后续打开/关闭也走这里
 watch(() => props.modelValue, (v) => {
     if (v) open()
     else stopPolling()

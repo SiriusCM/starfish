@@ -5,9 +5,9 @@ from crewai import Agent, Task, Crew, Process, LLM
 from settings import LLM_MODEL, LLM_BASE_URL, LLM_API_KEY, SCRIPT_DIR
 from .chat_log import append_history, write_chat_log, write_evolve_hint, history_context
 from .user_profile import rules_context
-from registry.agent_registry import list_agents, route, record_hit, current_version as agent_version
+from .registry.agent_registry import list_agents, route, record_hit, current_version as agent_version
 from . import mcp_client
-from registry import mcp_registry, prompt_registry, skill_registry
+from .registry import mcp_registry, prompt_registry, skill_registry, tool_catalog_registry
 
 # (mtime, module) cache —— 文件未变则复用已加载模块，避免重复 exec
 _SCRIPT_CACHE: dict = {}
@@ -53,9 +53,11 @@ def _get_llm():
 
 
 def _load_prompts():
-    """加载 prompts.py 并叠加 SQLite 中的常量覆盖。"""
+    """加载 prompts.py 并叠加 SQLite 中的常量覆盖，再合并工具目录。"""
     P = _load_script("prompts")
-    return prompt_registry.apply_overrides_to_module(P)
+    P = prompt_registry.apply_overrides_to_module(P)
+    tool_catalog_registry.apply_to_module(P)
+    return P
 
 
 # planner 单例：role/goal/backstory 全来自常量，无需每次重建
@@ -66,10 +68,12 @@ def _get_planner() -> Agent:
     P = _load_prompts()
     mtime = _script_mtime("prompts")
     p_ver = prompt_registry.current_version()
+    tc_ver = tool_catalog_registry.current_version()
     cached = _planner_cache.get("agent")
     if (cached is not None
             and _planner_cache.get("mtime") == mtime
-            and _planner_cache.get("prompt_ver") == p_ver):
+            and _planner_cache.get("prompt_ver") == p_ver
+            and _planner_cache.get("tc_ver") == tc_ver):
         return cached
     agent = Agent(
         role=P.PLANNER_ROLE,
@@ -84,6 +88,7 @@ def _get_planner() -> Agent:
     _planner_cache["agent"] = agent
     _planner_cache["mtime"] = mtime
     _planner_cache["prompt_ver"] = p_ver
+    _planner_cache["tc_ver"] = tc_ver
     return agent
 
 
@@ -315,5 +320,13 @@ def run(user_input: str) -> str:
     except Exception as e:
         err = f"执行出错：{type(e).__name__}: {e}"
         write_chat_log(user_input, err, error=True)
+        raise
+        raise
+        raise
+        raise
+        err = f"执行出错：{type(e).__name__}: {e}"
+        write_chat_log(user_input, err, error=True)
+        raise
+        raise
         raise
         raise

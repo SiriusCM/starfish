@@ -3,8 +3,8 @@ MCP 服务端增删改启停 + MCP 工具列表（内置 / MCP / 聚合）。
 """
 from flask import Blueprint, request, jsonify
 from core import mcp_client
-from registry import mcp_registry
-from web.state import (
+from core.registry import mcp_registry
+from api.state import (
     MCP_STATE, MCP_LOCK, BUILTIN_CACHE, BUILTIN_TTL,
     invalidate_tools_cache, ensure_mcp_loading,
 )
@@ -23,10 +23,10 @@ def _list_builtin_tools():
                 "name": getattr(t, "name", t.__class__.__name__),
                 "description": getattr(t, "description", "") or "",
                 "source": "builtin",
-                "server": "",
+                "api": "",
             })
     except Exception as e:
-        out.append({"name": "(builtin load error)", "description": str(e), "source": "error", "server": ""})
+        out.append({"name": "(builtin load error)", "description": str(e), "source": "error", "api": ""})
     return out
 
 
@@ -86,7 +86,7 @@ def api_mcp_toggle(sid: int):
 
 @bp.route("/reload", methods=["POST"])
 def api_mcp_reload():
-    """强制重连所有启用的 MCP server。"""
+    """强制重连所有启用的 MCP api。"""
     try:
         count = mcp_client.reload()
         invalidate_tools_cache()

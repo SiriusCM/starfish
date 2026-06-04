@@ -2,7 +2,7 @@
 Prompt 常量覆盖的读取、写入、重置。
 """
 from flask import Blueprint, request, jsonify
-from registry import prompt_registry
+from core.registry import prompt_registry
 
 bp = Blueprint("prompts", __name__, url_prefix="/api/prompts")
 

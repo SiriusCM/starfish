@@ -93,7 +93,7 @@ def _write_report(today, summary, results, decision, notes):
 def evolve(dry_run: bool = True) -> str:
     today = _today()
     if not _has_today_log():
-        print(f"⚠️ 未找到今日日志 logs/chat-{today}.md")
+        print(f"⚠️ 今日暂无进化摘要（请先进行对话）")
         return ""
     reset_proposals()
     evolver = _build_evolver_agent()
