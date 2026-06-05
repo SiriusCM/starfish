@@ -1,0 +1,16 @@
+/.venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
+.idea/
+
+# 前端构建相关
+/view/node_modules/
+/view/dist/
+/view/.vite/
+/view/npm-debug.log*
+/view/yarn-debug.log*
+/view/yarn-error.log*
+
+.DS_Store.idea/

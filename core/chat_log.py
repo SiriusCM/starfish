@@ -14,12 +14,12 @@ def append_history(user, answer):
         del _history[: len(_history) - MAX_HISTORY]
 
 
-def write_chat_log(user, answer, error=False):
-    """记录一条对话日志到数据库。"""
+def write_chat_log(user, answer, error=False, msg_type="chat"):
+    """记录一条对话日志到数据库。msg_type: chat=普通, system=系统消息"""
     conn = get_conn()
     conn.execute(
-        "INSERT INTO chat_logs (user_input, answer, is_error, created_at) VALUES (?, ?, ?, ?)",
-        (user, answer, 1 if error else 0, datetime.now().isoformat())
+        "INSERT INTO chat_logs (user_input, answer, is_error, msg_type, created_at) VALUES (?, ?, ?, ?, ?)",
+        (user, answer, 1 if error else 0, msg_type, datetime.now().isoformat())
     )
     conn.commit()
     conn.close()
@@ -36,22 +36,33 @@ def write_evolve_hint(user_input, hint):
     conn.close()
 
 
-def get_today_hints() -> str:
-    """获取今日的进化摘要（供 evolver 读取）。"""
-    today = datetime.now().strftime("%Y-%m-%d")
+def get_all_hints() -> str:
+    """获取所有进化摘要（供 evolver 读取）。"""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT user_input, hint, created_at FROM evolve_hints WHERE created_at LIKE ? ORDER BY id",
-        (f"{today}%",)
+        "SELECT user_input, hint, created_at FROM evolve_hints ORDER BY id"
     ).fetchall()
     conn.close()
     if not rows:
-        return f"(今日 {today} 暂无进化摘要)"
-    lines = [f"# 进化摘要 ({today})\n"]
+        return "(暂无进化摘要，请先进行对话)"
+    lines = ["# 进化摘要\n"]
     for r in rows:
+        date = r["created_at"][:10]
         ts = r["created_at"][11:19]
-        lines.append(f"## {ts}\n- 用户指令：{r['user_input']}\n- 摘要：{r['hint']}\n")
+        lines.append(f"## {date} {ts}\n- 用户指令：{r['user_input']}\n- 摘要：{r['hint']}\n")
     return "\n".join(lines)
+
+
+# 向后兼容别名
+get_today_hints = get_all_hints
+
+
+def clear_all_hints():
+    """清空所有进化摘要（进化应用后调用）。"""
+    conn = get_conn()
+    conn.execute("DELETE FROM evolve_hints")
+    conn.commit()
+    conn.close()
 
 
 def history_context():

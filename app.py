@@ -10,9 +10,8 @@ HELP = (
     "  starfish cli             进入控制台对话模式\n"
     "  starfish evolve          触发进化（dry-run 预览，不写盘）\n"
     "  starfish evolve --apply  触发进化并写盘生效\n"
-    "  starfish snapshots       查看已有快照列表\n"
-    "  starfish rollback [tag]  回滚到指定快照（默认最近一次）\n"
-    "  starfish web             启动 Web 界面（浏览器访问）\n"
+    "  starfish reports         查看进化报告列表\n"
+    "  starfish api             启动 Web 界面（浏览器访问）\n"
     "\n"
     "对话模式中：\n"
     "  直接输入 → 与 AI 对话\n"
@@ -49,7 +48,7 @@ def main():
         return
 
     if len(sys.argv) > 1 and sys.argv[1] == "web":
-        from core.server import run_server
+        from server import run_server
         print("🌐 启动 Web 服务: http://localhost:8765")
         print("   按 Ctrl+C 停止服务")
         run_server(host="0.0.0.0", port=8765)
@@ -60,25 +59,26 @@ def main():
         evolve(dry_run="--apply" not in sys.argv)
         return
 
-    if len(sys.argv) > 1 and sys.argv[1] == "snapshots":
-        from evolver.snapshot import list_snapshots
-        snaps = list_snapshots()
-        if not snaps:
-            print("（无快照）")
-        else:
-            print("📦 已有快照（新 → 旧）：")
-            for s in snaps:
-                print(f"  - {s}")
-        return
-
-    if len(sys.argv) > 1 and sys.argv[1] == "rollback":
-        from evolver.snapshot import rollback
-        tag = sys.argv[2] if len(sys.argv) > 2 else ""
-        print(f"↩️  {rollback(tag)}")
+    if len(sys.argv) > 1 and sys.argv[1] == "reports":
+        from database import get_conn
+        conn = get_conn()
+        rows = conn.execute(
+            """SELECT id, created_at, state, proposals_count,
+                      applied_count, failed_count, phase, result_msg
+               FROM evolve_reports ORDER BY id DESC LIMIT 20"""
+        ).fetchall()
+        conn.close()
+        if not rows:
+            print("（无进化报告）")
+            return
+        print("📋 进化报告（新 → 旧）：")
+        for r in rows:
+            tag = {"preview": "[预览]", "applied": "[已应用]", "failed": "[失败]"}.get(r["state"], "[?]")
+            print(f"  #{r['id']} {tag} {r['created_at'][:19]} | {r['phase']} | 提案:{r['proposals_count']} 成功:{r['applied_count']} 失败:{r['failed_count']}")
         return
 
     # 默认启动桌面版
-    from core.desktop import run_desktop
+    from desktop import run_desktop
     print("🖥️ 启动桌面应用...")
     sys.exit(run_desktop())
 

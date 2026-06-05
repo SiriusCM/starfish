@@ -1,11 +1,10 @@
 import os
 import json
-from datetime import datetime
 from crewai.tools import tool
 from settings import SCRIPT_DIR
 
-WRITABLE_FILES = {"prompts.py", "tools.py"}
-PROTECTED_FILES = set()
+# evolver 可修改的目录：仅限 script/ 下的 Python 文件
+PROTECTED_FILES = set()  # 由 CONSTITUTION.md 统一保护
 
 _proposals = []
 
@@ -55,50 +54,31 @@ def read_script_file(filename: str) -> str:
 
 
 
-@tool("read_today_log")
-def read_today_log(_: str = "") -> str:
-    """读取今日的进化摘要（已脱敏，不含原始对话）。无需输入参数。"""
-    from core.chat_log import get_today_hints
-    return get_today_hints()
-
-
-@tool("read_recent_evolve_reports")
-def read_recent_evolve_reports(n: str = "3") -> str:
-    """读取最近 N 份进化报告。参数 n 默认 '3'。"""
-    from database import get_conn
-    try:
-        k = int(str(n).strip() or 3)
-    except Exception:
-        k = 3
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT report, created_at FROM evolve_reports ORDER BY id DESC LIMIT ?", (k,)
-    ).fetchall()
-    conn.close()
-    if not rows:
-        return "(无报告)"
-    parts = []
-    for r in rows:
-        parts.append(f"========== {r['created_at'][:10]} ==========\n{r['report']}")
-    return "\n\n".join(parts)
+@tool("read_all_log")
+def read_all_log(_: str = "") -> str:
+    """读取所有进化摘要（已脱敏，不含原始对话）。无需输入参数。"""
+    from core.chat_log import get_all_hints
+    return get_all_hints()
 
 
 @tool("propose_edit")
 def propose_edit(payload: str) -> str:
     """提交一条修改提案（不立即写盘，由框架统一应用）。
     payload 为 JSON 字符串，结构：
-    {"file": "prompts.py | orchestrator.py | chat_log.py | tools.py", "old": "原文片段（必须在文件中精确存在）", "new": "替换为", "reason": "为何这么改"}
-    file 不允许是 CONSTITUTION.md（受保护）。
+    {"file": "纯文件名（如 prompts.py）", "old": "原文片段（必须在文件中精确存在）", "new": "替换为", "reason": "为何这么改"}
+    约束：file 必须是 script/ 目录下存在的 .py 文件（由 CONSTITUTION.md 统一保护其他目录）。
     """
     try:
         data = json.loads(payload)
     except Exception as e:
         return f"失败：payload 非合法 JSON：{e}"
     f = (data.get("file") or "").strip()
-    if f not in WRITABLE_FILES:
-        return f"失败：file 必须是 {sorted(WRITABLE_FILES - PROTECTED_FILES)} 之一，收到 {f!r}"
-    if f in PROTECTED_FILES:
-        return f"失败：{f} 是受保护文件，evolver 不可修改"
+    if not f.endswith(".py"):
+        return f"失败：file 必须是 .py 文件，收到 {f!r}"
+    # 验证文件存在于 script/ 目录
+    fp = os.path.join(SCRIPT_DIR, f)
+    if not os.path.isfile(fp):
+        return f"失败：文件不存在 script/{f}"
     if not data.get("old") or not data.get("new"):
         return "失败：old/new 不能为空"
     _proposals.append({
@@ -165,9 +145,9 @@ def propose_remove_rule(payload: str) -> str:
 
 @tool("propose_create_tool")
 def propose_create_tool(payload: str) -> str:
-    """新增一个 @tool 函数到 core/tools.py 并登记到 ALL_TOOLS。
+    """新增一个 @tool 函数到 script/tools.py 并登记到工具目录数据库。
     payload 为 JSON：
-    {"name": "snake_case_name", "param_name": "arg", "docstring": "...", "body": "Python 函数体源码(不含 def 行，缩进 4 空格)", "catalog_desc": "在 TOOL_CATALOG 中追加的描述", "reason": "为何需要"}
+    {"name": "snake_case_name", "param_name": "arg", "docstring": "...", "body": "Python 函数体源码(不含 def 行，缩进 4 空格)", "catalog_desc": "工具在目录中的描述", "reason": "为何需要"}
     """
     try:
         data = json.loads(payload)
@@ -196,7 +176,7 @@ def propose_create_tool(payload: str) -> str:
 def read_user_rules(_: str = "") -> str:
     """读取当前已学到的用户规则列表（全局+各智能体专属）。无需输入参数。"""
     from core.user_profile import load_rules
-    from core.agent_registry import list_agents, get_agent_rules
+    from core.registry.agent_registry import list_agents, get_agent_rules
     lines = []
     global_rules = load_rules()
     if global_rules:
@@ -216,7 +196,7 @@ def read_user_rules(_: str = "") -> str:
 @tool("read_agents")
 def read_agents(_: str = "") -> str:
     """读取当前已注册的智能体列表和领域统计数据。无需输入参数。用于判断是否需要裂变。"""
-    from core.agent_registry import list_agents, get_domain_stats, get_split_threshold
+    from core.registry.agent_registry import list_agents, get_domain_stats, get_split_threshold
     agents = list_agents()
     stats = get_domain_stats()
     threshold = get_split_threshold()
@@ -319,7 +299,7 @@ def propose_create_skill(payload: str) -> str:
 def read_skills(_: str = "") -> str:
     """读取当前已注册的 Skill 列表（含命中次数）。无需输入参数。
     用于判断某领域是否已有覆盖的 skill，避免重复创建。"""
-    from core.skill_registry import list_skills
+    from core.registry.skill_registry import list_skills
     items = list_skills(only_enabled=False)
     if not items:
         return "(暂无 Skill)"
@@ -334,15 +314,14 @@ def read_skills(_: str = "") -> str:
 
 @tool("finalize")
 def finalize(summary: str = "") -> str:
-    """声明已完成所有提案。参数 summary 是对今日改动的一句话总结。调用此工具后请结束任务。"""
+    """声明已完成所有提案。参数 summary 是对改动的一句话总结。调用此工具后请结束任务。"""
     return f"FINALIZED：共 {len(_proposals)} 条提案待框架应用。总结：{summary or '(无)'}"
 
 
 EVOLVER_TOOLS = [
     list_script_files,
     read_script_file,
-    read_today_log,
-    read_recent_evolve_reports,
+    read_all_log,
     read_user_rules,
     read_agents,
     read_skills,

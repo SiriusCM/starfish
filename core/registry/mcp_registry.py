@@ -47,7 +47,7 @@ def get_server(server_id: int) -> dict | None:
 
 
 def add_server(data: dict) -> int:
-    """新增 MCP server。data 字段：name, transport, command, args, env, url, enabled, description"""
+    """新增 MCP api。data 字段：name, transport, command, args, env, url, enabled, description"""
     payload = _normalize(data)
     with get_conn() as conn:
         cur = conn.execute(
@@ -144,7 +144,7 @@ def current_version() -> float:
 
 # ── 便利方法：返回 list[dict]（已反序列化）供 mcp_client 启动 ────
 def active_configs() -> list[dict]:
-    """返回启用的 MCP server 配置列表（字段已反序列化）。"""
+    """返回启用的 MCP api 配置列表（字段已反序列化）。"""
     return list_servers(only_enabled=True)
 
 
